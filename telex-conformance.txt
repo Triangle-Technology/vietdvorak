@@ -1,0 +1,413 @@
+# telex-conformance.txt — canonical conformance vectors for the VietDvorak
+# Telex engine (VietDvorak.ahk :: Transform()).
+#
+# ROLE: this file is the SINGLE SOURCE OF TRUTH for Telex behaviour. The AHK
+# input method and the practice.html trainer must both agree with it; when they
+# disagree, THIS FILE IS RIGHT and the implementation is wrong. Any change to
+# the engine's observable behaviour must land here in the same commit.
+# `node check-parity.mjs` runs every vector below through BOTH engines.
+#
+# FORMAT: one case per line, `input<TAB>expected`. Lines starting with # are
+# comments; blank lines are ignored. A line `@section <name>` opens a section
+# and says HOW the following inputs are fed to the engine — every vector must
+# sit under one, and the two sections are not interchangeable:
+#
+#   @section transform
+#       `input` is a sequence of LETTER keystrokes typed into an EMPTY buffer.
+#       Each character is fed to transform()/Transform() in turn; `expected` is
+#       the buffer after the last one. No non-letter may appear here: a space,
+#       a digit or a punctuation mark would end the syllable, and this section
+#       has no notion of a syllable ending.
+#
+#   @section integration
+#       `input` may contain ANY character. Each character goes through the
+#       per-keystroke apply path — the layer that consults the syllable-break
+#       rule and only then calls transform():
+#           break char  -> commit the buffer, append the char literally, buffer := ""
+#           other char  -> buffer := transform(buffer, char)
+#       `expected` is committed + buffer after the last character. These vectors
+#       drive the break rule END TO END — through the apply path and out into the
+#       text — for the characters they type. A mismatch there does not merely
+#       mistype the current syllable: it rewrites text that is already committed,
+#       which is how "Vieetj-Nams" once produced "Viết-Nam".
+#
+#       They are NOT the only thing pinning that rule. The rule is written twice
+#       — practice.html's isResetChar/LETTER_KEY, and VietDvorak.ahk's
+#       VkEndsSyllable() under the banner "KẾT THÚC ÂM TIẾT" — and
+#       check-parity.mjs ALSO sweeps VkEndsSyllable() across its whole VK range
+#       and compares it to isResetChar() key by key, then asserts by name the
+#       keep-alive codes no character can reach (Shift, VK_PACKET, Backspace) and
+#       the ones that must never be kept alive (Enter, Delete, the arrows...).
+#       The two halves do not overlap and neither replaces the other: the sweep
+#       proves the two implementations agree on every key, including the many no
+#       vector can type; the vectors below prove the agreed rule produces the
+#       right TEXT once it reaches the buffer. Delete either and a hole opens.
+#
+#       What is still outside both: the hotkey-registration loop at the bottom of
+#       that banner's block. Installing the rule means creating a real keyboard
+#       hook, so nothing can execute it under test — its loop bound and hotkey
+#       flags are checked as TEXT by check-parity.mjs (assertRegistration) and its
+#       control flow is not checked at all.
+#
+# NOTE on tone placement: generated with TONE_PLACEMENT_MODERN := true, i.e.
+# hoà / khoẻ / thuỷ. Flipping that constant in VietDvorak.ahk changes exactly
+# the oa / oe / uy open-syllable cases below (to hòa / khỏe / thủy) and nothing
+# else.
+
+@section transform
+
+# --- Header examples from VietDvorak.ahk (must never regress)
+tieengs	tiếng
+ngoaif	ngoài
+soajn	soạn
+Quynhf	Quỳnh
+ass	as
+aaa	aa
+oww	ow
+ww	w
+chww	chw
+luujw	lựu
+luuwj	lựu
+dduojcw	được
+giw	giư
+
+# --- Horn on the nucleus as a unit: uu / uou (C1)
+luuw	lưu
+luwu	lưu
+huwu	hưu
+cuuws	cứu
+luuwj	lựu
+luujw	lựu
+huouw	hươu
+huowu	hươu
+huwou	hươu
+ruouwj	rượu
+ruowuj	rượu
+ruoujw	rượu
+ruwouj	rượu
+buouws	bướu
+
+# --- Horn normalisation ưo / uơ -> ươ (C2); tone follows the nucleus
+dduwongf	đường
+dduowngf	đường
+dduwowngf	đường
+dduongwf	đường
+dduwocj	được
+dduocwj	được
+dduojcw	được
+dduwojc	được
+nguwoif	người
+nguowif	người
+nguwofi	người
+nguwowif	người
+truwongf	trường
+truowngf	trường
+nuwocs	nước
+nuowcs	nước
+tuwongr	tưởng
+tuwowngr	tưởng
+tuongwr	tưởng
+thuowng	thương
+thuowngf	thường
+giowis	giới
+mowis	mới
+
+
+# --- ...and the same rime at the END of the buffer: fixed EAGERLY, on sight
+# --- The two NUCLEUS_NORMALIZE entries differ in one bit — `lazy` — and that
+# --- bit is observable ONLY here, while the rime is still the whole tail of
+# --- the buffer. Every vector above types something after the rime, and by
+# --- then eager and lazy have converged on the same "ươ": they pin WHAT the
+# --- fix is and say nothing about WHEN it happens. These say when. "ưo" is
+# --- not a legal rime at any length, so there is no spelling to protect and
+# --- nothing to wait for — waiting would only park "đưo", a string that
+# --- cannot exist, on the screen. Contrast the "uơ" group below.
+uwo	ươ
+dduwo	đươ
+nguwo	ngươ
+tuwo	tươ
+Dduwo	Đươ
+NGUWO	NGƯƠ
+dduwoj	đượ
+nguwof	ngườ
+nuwos	nướ
+tuwor	tưở
+
+# --- A redundant "w" on an already-horned rime is SWALLOWED, never escaped
+# --- Once the rime is "ươ" the request for a horn is already satisfied, so a
+# --- further "w" has nothing left to undo: a pair-escape may only undo a horn
+# --- the USER typed, never one the engine inserted. Scoped to the target form
+# --- of NUCLEUS_NORMALIZE, so the DIACRITIC_PAIRS escapes ("oww" -> "ow",
+# --- "uww" -> "uw", "ww" -> "w", "chww" -> "chw") are untouched. Swallowing is
+# --- idempotent: further w's keep finding the same finished rime.
+uwoww	ươ
+dduwoww	đươ
+nguwoww	ngươ
+dduwowww	đươ
+dduwojw	đượ
+
+# --- uơ is a legal OPEN rime and must stay (thuở stem)
+thuow	thuơ
+thuowr	thuở
+huow	huơ
+quowr	quở
+uow	uơ
+quow	quơ
+
+# --- aw -> ă: the third w-pair, productively (ow/uw are covered above)
+# The "aww -> aw" escape below does NOT cover this: PAIR_ESCAPE is derived from
+# DIACRITIC_PAIRS, so a corrupted "aw" entry stays self-consistent through the
+# escape path and only a productive vector can see it.
+nawm	năm
+awn	ăn
+nawms	nắm
+nawngs	nắng
+hawngf	hằng
+phawngr	phẳng
+chawxn	chẵn
+lawngj	lặng
+nangws	nắng
+
+# --- Late "w" landing on an EARLIER vowel (the backward scan)
+# --- The horn goes to the last MODIFIABLE vowel, not to the last character,
+# --- so it reaches back over the consonants that follow it. One vector per
+# --- W_MODIFIER cell picked by this scan: a -> ă, u -> ư (o -> ơ is "dduojcw"
+# --- and "tuongwr" above).
+nangw	năng
+cungw	cưng
+ddungwf	đừng
+
+# --- Tone placement: glide pairs oa / oe / uy (C3, TONE_PLACEMENT_MODERN=true)
+hoaf	hoà
+hoaj	hoạ
+khoer	khoẻ
+thuyr	thuỷ
+huyr	huỷ
+tuyf	tuỳ
+Hoaf	Hoà
+
+# --- Tone placement: everything else is unchanged by that convention
+soajn	soạn
+toanf	toàn
+hoaij	hoại
+xoays	xoáy
+ngoaif	ngoài
+cuar	của
+muaf	mùa
+kiaf	kìa
+chaof	chào
+ngayf	ngày
+camr	cảm
+banj	bạn
+hocj	học
+
+# --- gi / qu initial clusters (the cluster vowel is not a tone target)
+gias	giá
+gif	gì
+giowf	giờ
+giuwx	giữ
+giuwax	giữa
+giw	giư
+quaf	quà
+quar	quả
+quys	quý
+quoocs	quốc
+quyeets	quyết
+Quynhf	Quỳnh
+
+# --- Unikey w shortcut (empty or consonant-only buffer) and its ww escape
+w	ư
+ww	w
+tw	tư
+chw	chư
+chww	chw
+nghw	nghư
+chwx	chữ
+mwa	mưa
+dwa	dưa
+W	Ư
+WW	W
+CHW	CHƯ
+
+# --- "w" after a vowel that HAS no horned form: nothing for the backward scan
+# --- to land on, and no pair to escape, so the "w" is appended literally
+caaw	câw
+
+# --- Each DIACRITIC_PAIRS cell alone, as the whole buffer: the shortest
+# --- possible statement of what every pair produces
+aa	â
+ee	ê
+oo	ô
+dd	đ
+aw	ă
+ow	ơ
+uw	ư
+
+# --- Diacritic-pair escape: press the trigger key a third time
+aaa	aa
+eee	ee
+ooo	oo
+ddd	dd
+aww	aw
+oww	ow
+uww	uw
+
+# --- The same escape in uppercase: the restored first letter keeps the case
+# --- of the pair that was typed ("AAA" -> "AA", not "aA"). PAIR_ESCAPE's
+# --- uppercase half is derived by toUpperCase / StrUpper — once per engine,
+# --- by hand, which is exactly the kind of expression that drifts alone.
+AAA	AA
+EEE	EE
+OOO	OO
+DDD	DD
+AWW	AW
+OWW	OW
+UWW	UW
+
+# --- Tone removal: press the same tone key twice
+ass	as
+aff	af
+arr	ar
+axx	ax
+oss	os
+eess	ês
+vieejtj	viêtj
+hocjj	hocj
+
+# --- Uppercase and mixed case (UPPER_VOWELS is DERIVED from VOWELS by
+# --- StrUpper/toUpperCase, so one cell per vowel row pins that derivation)
+TIEENGS	TIẾNG
+Vieejt	Việt
+Ddaij	Đại
+DDAIJ	ĐẠI
+NGUWOIF	NGƯỜI
+QUYNHF	QUỲNH
+LUUWJ	LỰU
+HUOUW	HƯƠU
+Nam	Nam
+DDuwongf	Đường
+NAWM	NĂM
+NAWNGS	NẮNG
+DDAAY	ĐÂY
+DDEPJ	ĐẸP
+HOCJ	HỌC
+KHOONG	KHÔNG
+TRUOWNGF	TRƯỜNG
+NGUWOWIF	NGƯỜI
+
+# --- A pair takes its case from its FIRST key, not its second: every vector
+# --- above types both keys in the same case, so nothing yet says which one
+# --- decides.
+Aa	Â
+aA	â
+
+# --- Common words, canonical order (modifier then tone)
+vieetj	việt
+nooij	nội
+ddaij	đại
+sinh	sinh
+nhaf	nhà
+toots	tốt
+ddepj	đẹp
+khoong	không
+cos	có
+ddaay	đây
+laf	là
+cuoocj	cuộc
+soongs	sống
+muoons	muốn
+thees	thế
+lamf	làm
+vieecj	việc
+hoom	hôm
+tooi	tôi
+chungs	chúng
+nhieeuf	nhiều
+ddieeuf	điều
+hieeur	hiểu
+yeeu	yêu
+tuwf	từ
+ddieenr	điển
+bieets	biết
+ddoongf	đồng
+ys	ý
+nghix	nghĩ
+chuwx	chữ
+ddaats	đất
+xin	xin
+own	ơn
+nam	nam
+
+# --- Same words, late-tone order (tone key typed mid-syllable, then the rest)
+tieesng	tiếng
+vieejt	việt
+cuoojc	cuộc
+muoosn	muốn
+ddoofng	đồng
+nooji	nội
+nhieefu	nhiều
+hieeru	hiểu
+bieest	biết
+ddieern	điển
+lafm	làm
+tofan	toàn
+ngofai	ngoài
+hojc	học
+bajn	bạn
+ddaji	đại
+chafo	chào
+ngafy	ngày
+nuwosc	nước
+
+# --- VOWELS cells the word vectors above never reach. Each of the 72 lowercase
+# --- cells is a hand-typed Unicode literal duplicated in BOTH engines; a typo in
+# --- one is invisible unless some vector produces that exact character. These
+# --- close the remaining gaps so the whole table is pinned, one word per cell.
+ddax	đã
+caanf	cần
+aanr	ẩn
+maaux	mẫu
+baanj	bận
+bes	bé
+hef	hè
+lex	lẽ
+nhieexm	nhiễm
+chis	chí
+chir	chỉ
+bij	bị
+bof	bò
+nhor	nhỏ
+voxng	võng
+toor	tổ
+looix	lỗi
+mowx	mỡ
+cux	cũ
+vuj	vụ
+thuwr	thử
+myx	mỹ
+quyj	quỵ
+
+@section integration
+
+# --- Syllable break: only A-Za-z continues a syllable, everything else ends it
+# --- and is committed literally. Drives the apply path, not bare transform().
+Vieetj-Nams	Việt-Nám
+xin chaof	xin chào
+uw uw	ư ư
+tri.f	tri.f
+co-s	co-s
+a1s	a1s
+hocj2s	học2s
+hoc2j	hoc2j
+ddaij.	đại.
+
+# --- An uppercase letter must CONTINUE a syllable, not end it. Every vector
+# --- above capitalises only at buffer-start or straight after a break char,
+# --- where resetting and not-resetting look identical — so narrowing the rule
+# --- to /^[a-z]$/ (forgetting uppercase, one character) passed all of them.
+# --- Here the capitals have to survive INSIDE a syllable: "DDaij." needs the
+# --- second D to reach the first to make "Đ", and "TIEENGS" is capitalised
+# --- from the second character on.
+DDaij.	Đại.
+xin TIEENGS	xin TIẾNG
+UW UW	Ư Ư

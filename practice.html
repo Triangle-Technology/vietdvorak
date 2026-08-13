@@ -1,0 +1,3418 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VietDvorak Practice</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%237aa2f7'/%3E%3Ctext x='50%25' y='52' font-family='system-ui,sans-serif' font-size='44' font-weight='700' fill='%231a1b26' text-anchor='middle'%3EĐ%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #1a1b26;
+    --fg: #c0caf5;
+    --muted: #565f89;
+    --accent: #7aa2f7;
+    --good: #9ece6a;
+    --bad: #f7768e;
+    --warn: #e0af68;
+    --panel: #24283b;
+    --border: #414868;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  #container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .header-mid {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .stats {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .stats b { color: var(--fg); font-weight: 600; }
+  .mode-toggle {
+    display: inline-flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .mode-btn {
+    background: transparent;
+    border: none;
+    padding: 5px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    border-radius: 4px;
+    font-family: inherit;
+  }
+  .mode-btn:hover { color: var(--fg); }
+  .mode-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+  /* Free-mode display: bigger, multi-line, selectable text */
+  body.mode-free #input-display {
+    min-height: 160px;
+    font-size: 22px;
+    text-align: left;
+    padding: 16px 20px;
+    line-height: 1.5;
+    user-select: text;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .free-actions {
+    display: none;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 12px;
+  }
+  body.mode-free .free-actions { display: flex; }
+  body.mode-free .practice-only { display: none !important; }
+  .char-count {
+    font-size: 13px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .copy-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--good);
+    color: var(--bg);
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+  }
+  .copy-toast.show { opacity: 1; }
+  .target {
+    text-align: center;
+    margin: 48px 0 24px;
+  }
+  .target-word {
+    font-size: 56px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+  .target-hint {
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .target-hint code {
+    background: var(--panel);
+    padding: 4px 10px;
+    border-radius: 4px;
+    color: var(--accent);
+    font-size: 14px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    margin-left: 6px;
+  }
+  .input-area {
+    margin: 32px 0 8px;
+  }
+  #input-display {
+    width: 100%;
+    min-height: 80px;
+    background: var(--panel);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    font-size: 32px;
+    font-weight: 300;
+    color: var(--fg);
+    outline: none;
+    transition: border-color 0.2s;
+    text-align: center;
+    cursor: text;
+    user-select: none;
+    word-break: break-word;
+  }
+  #input-display:focus { border-color: var(--accent); }
+  #input-display.match { border-color: var(--good); background: rgba(158, 206, 106, 0.08); }
+  #input-display.partial-good { border-color: var(--accent); }
+  #input-display.bad { border-color: var(--bad); }
+  #input-display .cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    margin-left: 1px;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  #input-display .placeholder { color: var(--muted); font-style: italic; }
+  .feedback {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 14px;
+    min-height: 20px;
+    color: var(--muted);
+  }
+  .feedback.good { color: var(--good); }
+  .feedback.bad { color: var(--bad); }
+  /* Warning shown when an external Vietnamese IME is composing on top of us */
+  .ime-warning {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--warn);
+    border-radius: 6px;
+    background: rgba(224, 175, 104, 0.1);
+    color: var(--warn);
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .ime-warning[hidden] { display: none; }
+  .ime-warning kbd { color: var(--warn); border-color: var(--warn); }
+  .ime-warning button {
+    margin-left: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--warn);
+    border-color: var(--warn);
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+  button, select {
+    background: var(--panel);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  label { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .reference {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .reference h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .ref-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+  .ref-grid h3 {
+    font-size: 13px;
+    color: var(--accent);
+    margin: 0 0 12px;
+    font-weight: 600;
+  }
+  .ref-grid table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ref-grid td { padding: 4px 8px; }
+  .ref-grid tr td:first-child { width: 60px; }
+  kbd {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+  code {
+    font-family: "JetBrains Mono", Consolas, monospace;
+    color: var(--accent);
+  }
+  .toggle-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .toggle-row label { cursor: pointer; }
+  /* Virtual keyboard — kept close to the input area; this is core UI */
+  .kb-section {
+    margin: 16px 0 8px;
+    text-align: center;
+  }
+  .kb-section .kb-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    opacity: 0.7;
+  }
+  .keyboard {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--panel);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .kb-row {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-start;
+  }
+  .kb-row.r2 { padding-left: 24px; }
+  .kb-row.r3 { padding-left: 32px; }
+  .kb-row.r4 { justify-content: center; }   /* space bar */
+  .kb-key {
+    width: 38px;
+    height: 38px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    transition: all 0.08s ease;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .kb-dv {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    line-height: 1;
+  }
+  .kb-qw {
+    position: absolute;
+    bottom: 2px;
+    right: 3px;
+    font-size: 8px;
+    color: var(--muted);
+    opacity: 0.55;
+    line-height: 1;
+  }
+  .kb-key.role-vowel { border-color: rgba(122, 162, 247, 0.5); }
+  .kb-key.role-vowel .kb-dv { color: var(--accent); }
+  .kb-key.role-tone {
+    background: rgba(247, 118, 142, 0.08);
+    border-color: rgba(247, 118, 142, 0.5);
+  }
+  .kb-key.role-tone .kb-dv { color: var(--bad); font-weight: 600; }
+  .kb-key.role-mod {
+    background: rgba(224, 175, 104, 0.08);
+    border-color: rgba(224, 175, 104, 0.5);
+  }
+  .kb-key.role-mod .kb-dv { color: var(--warn); }
+  /* Home-position keys (a o e u | h t n s) — where touch-typing fingers rest */
+  .kb-key.home .kb-dv { font-weight: 700; font-size: 16px; }
+  .kb-key.home::before {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 2px;
+    background: var(--fg);
+    opacity: 0.55;
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  .kb-key.pressed {
+    background: var(--accent);
+    transform: translateY(1px);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .kb-key.pressed .kb-dv,
+  .kb-key.pressed .kb-qw { color: var(--bg); }
+  .kb-key.wide { width: 240px; }
+  .kb-key.wide .kb-dv {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .kb-key.next-hint {
+    box-shadow: 0 0 0 2px var(--good);
+    animation: hintPulse 1.4s ease-in-out infinite;
+  }
+  /* This key is only correct WITH Shift. Matching is case-sensitive (the word
+     lists are full of proper nouns — Việt, Hà Nội, Nguyễn), so a hint that just
+     lit the key would send the typist into a state no keystroke can finish. */
+  .kb-key.next-hint-shift::after {
+    content: '⇧';
+    position: absolute;
+    top: 1px;
+    left: 3px;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--good);
+    pointer-events: none;
+  }
+  @keyframes hintPulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--good); }
+    50% { box-shadow: 0 0 0 4px rgba(158, 206, 106, 0.4); }
+  }
+  .kb-legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .kb-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .kb-legend .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+  .kb-legend .home-swatch {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    position: relative;
+  }
+  .kb-legend .home-swatch::after {
+    content: '';
+    position: absolute;
+    bottom: 1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 1.5px;
+    background: var(--fg);
+    opacity: 0.7;
+    border-radius: 1px;
+  }
+
+  @media (max-width: 600px) {
+    .target-word { font-size: 40px; }
+    #input-display { font-size: 24px; }
+    .ref-grid { grid-template-columns: 1fr; }
+    .kb-key { width: 30px; height: 30px; }
+    .kb-key.wide { width: 170px; }
+    .kb-dv { font-size: 12px; }
+    .kb-key.wide .kb-dv { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+  <div id="container">
+    <header>
+      <h1>VietDvorak</h1>
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="practice">Luyện tập</button>
+        <button class="mode-btn" data-mode="free">Gõ tự do</button>
+      </div>
+      <div class="stats practice-only">
+        <span>WPM <b id="wpm">—</b></span>
+        <span>Đúng <b id="acc">100</b>%</span>
+        <span>Từ <b id="wordnum">1</b>/<b id="wordtotal">10</b></span>
+      </div>
+    </header>
+
+    <div class="target practice-only">
+      <div class="target-word" id="target-word">—</div>
+      <div class="target-hint">
+        Gõ chuỗi:
+        <code id="target-keys">—</code>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div id="input-display" tabindex="0"></div>
+      <div class="feedback" id="feedback">Click vào ô và bắt đầu gõ. Tone keys: s f r x j</div>
+      <div class="ime-warning" id="ime-warning" hidden>
+        ⚠️ Đang có bộ gõ tiếng Việt khác bật (VietDvorak chế độ VN, Unikey, EVKey…).
+        Trang này tự xử lý Telex, hai bộ gõ chồng lên nhau sẽ làm hỏng chữ và sai thống kê.
+        Hãy tắt chế độ VN — nhấn đúp <kbd>CapsLock</kbd> hoặc <kbd>Ctrl+Shift+V</kbd> — rồi bấm
+        <button id="ime-dismiss" type="button">Đã tắt — gõ tiếp</button>
+      </div>
+      <div class="free-actions">
+        <button id="btn-copy">📋 Copy</button>
+        <button id="btn-clear">Xoá hết</button>
+        <span class="char-count" id="char-count">0 ký tự</span>
+      </div>
+    </div>
+
+    <section class="kb-section" id="kb-section">
+      <div class="keyboard" id="keyboard"></div>
+      <div class="kb-legend">
+        <span><span class="swatch home-swatch"></span>Đặt ngón tay (a o e u · h t n s)</span>
+        <span><span class="swatch" style="background: rgba(122,162,247,0.15); border-color: rgba(122,162,247,0.5)"></span>Nguyên âm</span>
+        <span><span class="swatch" style="background: rgba(247,118,142,0.15); border-color: rgba(247,118,142,0.5)"></span>Dấu thanh</span>
+        <span><span class="swatch" style="background: rgba(224,175,104,0.15); border-color: rgba(224,175,104,0.5)"></span>Bộ chỉnh (w, d)</span>
+        <span><span class="swatch" style="background: var(--accent); border-color: var(--accent)"></span>Vừa nhấn</span>
+        <span><span class="swatch" style="border-color: var(--good); background: transparent"></span>Phím có thể gõ tiếp (mọi thứ tự đều được)</span>
+        <!-- "chữ hoa" alone mis-described the mechanism: the badge fires for every
+             key whose character needs Shift, and shifted PUNCTUATION is the case
+             SHIFTED_KEYS was added for — without "?" the hint goes dark on the last
+             character of "Bạn có khoẻ không?". -->
+        <span><span style="color: var(--good); font-weight: 700">⇧</span>Phím này phải giữ Shift (chữ hoa · dấu câu như ?)</span>
+      </div>
+      <div class="kb-sub">
+        Chữ to = ký tự Dvorak sẽ được gõ ra · Số bé bên dưới-phải = vị trí phím trên bàn phím QWERTY của bạn
+      </div>
+    </section>
+
+    <div class="controls practice-only">
+      <button id="skip">Bỏ qua →</button>
+      <button id="reset">Reset stats</button>
+      <label>
+        Cấp độ:
+        <select id="level">
+          <option value="easy">Dễ — từ đơn</option>
+          <option value="medium">Trung — từ ghép</option>
+          <option value="hard">Khó — đa âm tiết phức</option>
+          <option value="sentence">Câu</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <label class="practice-only"><input type="checkbox" id="show-hint" checked> Hiện chuỗi gõ</label>
+      <label class="practice-only"><input type="checkbox" id="auto-advance" checked> Tự chuyển từ khi đúng</label>
+      <label><input type="checkbox" id="show-kb" checked> Hiện bàn phím ảo</label>
+      <label class="practice-only"><input type="checkbox" id="show-next" checked> Gợi ý phím kế</label>
+    </div>
+
+    <div class="copy-toast" id="copy-toast">✓ Đã copy</div>
+
+    <section class="reference">
+      <h2>Bảng tham chiếu — VietDvorak Telex</h2>
+      <div class="ref-grid">
+        <div>
+          <h3>Dấu thanh (gõ sau nguyên âm)</h3>
+          <table>
+            <tr><td><kbd>s</kbd></td><td>sắc</td><td><code>as</code> → á</td></tr>
+            <tr><td><kbd>f</kbd></td><td>huyền</td><td><code>af</code> → à</td></tr>
+            <tr><td><kbd>r</kbd></td><td>hỏi</td><td><code>ar</code> → ả</td></tr>
+            <tr><td><kbd>x</kbd></td><td>ngã</td><td><code>ax</code> → ã</td></tr>
+            <tr><td><kbd>j</kbd></td><td>nặng</td><td><code>aj</code> → ạ</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>Nguyên âm có dấu mũ/móc</h3>
+          <table>
+            <tr><td><code>aa</code></td><td>→ â</td><td></td></tr>
+            <tr><td><code>aw</code></td><td>→ ă</td><td></td></tr>
+            <tr><td><code>ee</code></td><td>→ ê</td><td></td></tr>
+            <tr><td><code>oo</code></td><td>→ ô</td><td></td></tr>
+            <tr><td><code>ow</code></td><td>→ ơ</td><td></td></tr>
+            <tr><td><code>uw</code></td><td>→ ư</td><td></td></tr>
+            <tr><td><code>dd</code></td><td>→ đ</td><td></td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+'use strict';
+
+// ============================================================================
+// TELEX ALGORITHM (mirror of VietDvorak.ahk :: Transform())
+// ============================================================================
+// The canonical behaviour spec lives in telex-conformance.txt — one
+// `input<TAB>expected` case per line. Both implementations (the AHK input method
+// and this trainer) must agree with that file; when they disagree, the FILE is
+// right and the implementation is wrong.
+//
+// check-parity.mjs extracts the block between the BEGIN/END markers below out of
+// this HTML and runs every vector against it. So: do not rename the markers, and
+// do not reference anything outside the block (no DOM, no page state) from inside
+// it — the block has to stand on its own.
+
+// BEGIN TELEX ENGINE — mirror of VietDvorak.ahk; spec: telex-conformance.txt
+
+// Tone placement for the three glide pairs "oa", "oe", "uy" in an OPEN syllable.
+// Vietnamese accepts two conventions; Unikey calls the option "Đặt dấu oà, uý":
+//   true  (modern)      -> hoà, khoẻ, thuỷ   — tone on the main vowel
+//   false (traditional) -> hòa, khỏe, thủy   — tone on the glide
+// Both are accepted; what is mandatory is being CONSISTENT across all three
+// pairs. Flip it here only — never sprinkle if-else into findToneTarget().
+// Must stay in sync with TONE_PLACEMENT_MODERN in VietDvorak.ahk.
+const TONE_PLACEMENT_MODERN = true;
+
+// The glide + main-vowel pairs the two conventions disagree about.
+const GLIDE_PAIRS = ['oa', 'oe', 'uy'];
+
+const VOWELS = {
+  'a': ['a', 'á', 'à', 'ả', 'ã', 'ạ'],
+  'ă': ['ă', 'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ'],
+  'â': ['â', 'ấ', 'ầ', 'ẩ', 'ẫ', 'ậ'],
+  'e': ['e', 'é', 'è', 'ẻ', 'ẽ', 'ẹ'],
+  'ê': ['ê', 'ế', 'ề', 'ể', 'ễ', 'ệ'],
+  'i': ['i', 'í', 'ì', 'ỉ', 'ĩ', 'ị'],
+  'o': ['o', 'ó', 'ò', 'ỏ', 'õ', 'ọ'],
+  'ô': ['ô', 'ố', 'ồ', 'ổ', 'ỗ', 'ộ'],
+  'ơ': ['ơ', 'ớ', 'ờ', 'ở', 'ỡ', 'ợ'],
+  'u': ['u', 'ú', 'ù', 'ủ', 'ũ', 'ụ'],
+  'ư': ['ư', 'ứ', 'ừ', 'ử', 'ữ', 'ự'],
+  'y': ['y', 'ý', 'ỳ', 'ỷ', 'ỹ', 'ỵ']
+};
+
+// Derived from VOWELS at load time — the vowel/tone table exists in exactly one
+// place, so adding a tone or a vowel there needs no second edit here.
+const UPPER_VOWELS = {};
+for (const [bv, tones] of Object.entries(VOWELS)) {
+  UPPER_VOWELS[bv.toUpperCase()] = tones.map(t => t.toUpperCase());
+}
+
+const TONE_KEYS = { 's': 1, 'f': 2, 'r': 3, 'x': 4, 'j': 5 };
+
+const DIACRITIC_PAIRS = {
+  'aa': 'â', 'ee': 'ê', 'oo': 'ô',
+  'aw': 'ă', 'ow': 'ơ', 'uw': 'ư',
+  'dd': 'đ'
+};
+
+// Reverse map for escape: pair-result char -> { firstChar, secondKey }
+// Used so typing the same pair-trigger key twice undoes the diacritic.
+//   "oo" -> ô,  "ooo" -> oo (escape)
+//   "ow" -> ơ,  "oww" -> ow
+//   "dd" -> đ,  "ddd" -> dd
+// Derived (inverted) from DIACRITIC_PAIRS — no hand-kept second copy to forget.
+const PAIR_ESCAPE = {};
+for (const [pair, result] of Object.entries(DIACRITIC_PAIRS)) {
+  const first = pair[0], second = pair[1];
+  PAIR_ESCAPE[result] = { firstChar: first, secondKey: second };
+  PAIR_ESCAPE[result.toUpperCase()] = { firstChar: first.toUpperCase(), secondKey: second };
+}
+
+// Plain vowel -> horned/breved vowel, also derived from DIACRITIC_PAIRS (exactly
+// the entries whose second key is "w"):  a -> ă,  o -> ơ,  u -> ư
+const W_MODIFIER = {};
+for (const [pair, result] of Object.entries(DIACRITIC_PAIRS)) {
+  if (pair[1] === 'w') W_MODIFIER[pair[0]] = result;
+}
+
+// The horn belongs to the vowel CLUSTER, not to a single character. Listed here
+// are only the clusters where the horn does NOT land on the last vowel; every
+// other cluster goes through the aw/ow/uw pair or the backward scan.
+//   uu  -> ưu    lựu, hưu, cứu     ("uư" does not exist in Vietnamese)
+//   uou -> ươu   rượu, hươu, bướu  ("uoư" does not exist)
+const HORN_NUCLEUS = { 'uu': 'ưu', 'uou': 'ươu' };
+
+// Rime normalisation: vowel sequences that cannot exist -> their real spelling.
+// None of these occur in Vietnamese, so the correction is unambiguous.
+//   ưo -> ươ    đưoc -> được, ngưoi -> người, rưou -> rượu
+//   uơ -> ươ    đuợc -> được, thuơng -> thương
+//
+// `lazy` = fix only once the rime has a CHARACTER AFTER it. The two entries
+// differ in exactly that one bit, and the bit is a property of the RIME, not of
+// the algorithm:
+//   "uơ" IS a legal open rime on its own (thuơ/thuở, huơ, quơ). Fixing it on
+//        sight would destroy correct spelling, so it has to wait and see whether
+//        the typist carries on or stops here                          -> lazy.
+//   "ưo" is not a legal rime at ANY length, so there is no spelling to protect.
+//        Waiting only puts "đưo" — a string that cannot exist — on screen, and
+//        leaves it there if the typist stops                          -> eager.
+// Hence the condition lives in the TABLE rather than in an if-else naming a rime
+// inside normalizeNucleus(): adding a rime is adding one line here.
+// Must stay in sync with NUCLEUS_NORMALIZE in VietDvorak.ahk.
+const NUCLEUS_NORMALIZE = {
+  'ưo': { fixed: 'ươ', lazy: false },
+  'uơ': { fixed: 'ươ', lazy: true }
+};
+
+const ALL_VOWEL_CHARS = new Set();
+for (const tones of Object.values(VOWELS))
+  for (const t of tones) ALL_VOWEL_CHARS.add(t);
+for (const tones of Object.values(UPPER_VOWELS))
+  for (const t of tones) ALL_VOWEL_CHARS.add(t);
+
+// Composed vowel -> { base, tone, isUpper }, INDEXED from the two tables above
+// at load time. Not a second copy of the data: it is the same cells, keyed the
+// other way round, so a change to VOWELS still lands here by itself.
+// The old scan walked both tables (allocating an entries array per call) on
+// every lookup, and findVowelInfo() is the engine's innermost operation — every
+// buffer inspection goes through it. Indexing it makes transform() cheap enough
+// that reachability can be answered by REPLAYING the engine (see exploreToward()
+// and its caller canStillFinish()).
+// The returned object is shared, so callers must treat it as read-only.
+const VOWEL_INFO = new Map();
+for (const [base, tones] of Object.entries(VOWELS)) {
+  tones.forEach((ch, tone) => VOWEL_INFO.set(ch, { base, tone, isUpper: false }));
+}
+for (const [base, tones] of Object.entries(UPPER_VOWELS)) {
+  tones.forEach((ch, tone) => VOWEL_INFO.set(ch, { base, tone, isUpper: true }));
+}
+
+function findVowelInfo(ch) {
+  return VOWEL_INFO.get(ch) || null;
+}
+
+// Bare base letter (lowercase, tone stripped) of a vowel; '' if not a vowel.
+//   "ừ" -> "ư",  "Ộ" -> "ô",  "c" -> ""
+function vowelBase(ch) {
+  const info = findVowelInfo(ch);
+  return info ? info.base.toLowerCase() : '';
+}
+
+// Change the base letter of the vowel at chars[i], KEEPING its tone and its
+// case:  "ọ" + "ơ" -> "ợ",  "U" + "ư" -> "Ư". Every rime fix goes through here,
+// so tone-preservation is written once instead of at each call site.
+function setVowelBaseAt(chars, i, baseLower) {
+  const info = findVowelInfo(chars[i]);
+  if (!info) return false;
+  chars[i] = info.isUpper
+    ? UPPER_VOWELS[baseLower.toUpperCase()][info.tone]
+    : VOWELS[baseLower][info.tone];
+  return true;
+}
+
+function isGlidePair(prevV, lastV) {
+  return GLIDE_PAIRS.includes(prevV + lastV);
+}
+
+// Every vowel in chars[from..], as { pos, baseLower }. findToneTarget scans twice
+// — once past a leading "qu"/"gi" cluster, once from 0 when that skip turned out
+// to have eaten the only vowel — so the scan itself lives here, once.
+function collectVowels(chars, from) {
+  const vowels = [];
+  for (let i = from; i < chars.length; i++) {
+    if (!ALL_VOWEL_CHARS.has(chars[i])) continue;
+    const info = findVowelInfo(chars[i]);
+    vowels.push({
+      pos: i,
+      baseLower: info ? info.base.toLowerCase() : chars[i].toLowerCase()
+    });
+  }
+  return vowels;
+}
+
+// Choose which vowel should host the tone, following Vietnamese rules:
+//   1. Skip leading "qu" or "gi" + vowel (these are initial consonant clusters).
+//   2. If only 1 vowel, use it.
+//   3. Prefer the LAST modified vowel (â, ă, ê, ô, ơ, ư) if present.
+//   4. If syllable ends in a consonant, tone on the last vowel.
+//   5. Open syllable: glide pair (oa/oe/uy) -> per TONE_PLACEMENT_MODERN;
+//      otherwise the second-to-last vowel.
+function findToneTarget(chars) {
+  let startIdx = 0;
+  // Skip "qu" + vowel
+  if (chars.length >= 3
+      && (chars[0] === 'q' || chars[0] === 'Q')
+      && (chars[1] === 'u' || chars[1] === 'U')
+      && ALL_VOWEL_CHARS.has(chars[2])) {
+    startIdx = 2;
+  }
+  // Skip "gi" + vowel (but not "gi" alone)
+  else if (chars.length >= 3
+      && (chars[0] === 'g' || chars[0] === 'G')
+      && (chars[1] === 'i' || chars[1] === 'I')
+      && ALL_VOWEL_CHARS.has(chars[2])) {
+    startIdx = 2;
+  }
+
+  let vowels = collectVowels(chars, startIdx);
+
+  // Fall back to full scan if cluster skip ate the only vowel
+  if (vowels.length === 0 && startIdx > 0) vowels = collectVowels(chars, 0);
+
+  if (vowels.length === 0) return -1;
+  if (vowels.length === 1) return vowels[0].pos;
+
+  // Prefer the LAST modified vowel (handles "ươ" -> tone on ơ, etc.)
+  const MODIFIED = ['â', 'ă', 'ê', 'ô', 'ơ', 'ư'];
+  let modifiedPos = -1;
+  for (const v of vowels) {
+    if (MODIFIED.includes(v.baseLower)) modifiedPos = v.pos;
+  }
+  if (modifiedPos >= 0) return modifiedPos;
+
+  const lastChar = chars[chars.length - 1];
+  if (!ALL_VOWEL_CHARS.has(lastChar)) {
+    // Closed syllable: tone on last vowel
+    return vowels[vowels.length - 1].pos;
+  }
+
+  // Open syllable: oa/oe/uy are exactly the three pairs the two placement
+  // conventions disagree about — all three are handled the SAME way, driven by
+  // TONE_PLACEMENT_MODERN. Anything else: second-to-last vowel.
+  const lastV = vowels[vowels.length - 1].baseLower;
+  const prevV = vowels[vowels.length - 2].baseLower;
+  if (TONE_PLACEMENT_MODERN && isGlidePair(prevV, lastV)) {
+    return vowels[vowels.length - 1].pos;
+  }
+  return vowels[vowels.length - 2].pos;
+}
+
+function applyToneToBuffer(buffer, toneIdx) {
+  const chars = [...buffer];
+  const targetIdx = findToneTarget(chars);
+  if (targetIdx < 0) return null;
+
+  const info = findVowelInfo(chars[targetIdx]);
+  if (!info) return null;
+
+  // Always apply (escape "ss" -> "as" is handled in transform())
+  const table = info.isUpper ? UPPER_VOWELS : VOWELS;
+  chars[targetIdx] = table[info.base][toneIdx];
+  return chars.join('');
+}
+
+function applyDiacriticPair(buffer) {
+  const chars = [...buffer];
+  if (chars.length < 2) return buffer;
+  const last2 = chars.slice(-2).join('');
+  const last2Lower = last2.toLowerCase();
+  if (!(last2Lower in DIACRITIC_PAIRS)) return buffer;
+
+  let replacement = DIACRITIC_PAIRS[last2Lower];
+  const firstChar = last2[0];
+  if (firstChar !== firstChar.toLowerCase()) {
+    replacement = replacement.toUpperCase();
+  }
+  return chars.slice(0, -2).join('') + replacement;
+}
+
+// Return { pos, toneIdx } if buffer has a toned vowel, else null
+function getCurrentTone(buffer) {
+  const chars = [...buffer];
+  for (let i = 0; i < chars.length; i++) {
+    if (ALL_VOWEL_CHARS.has(chars[i])) {
+      const info = findVowelInfo(chars[i]);
+      if (info && info.tone > 0) return { pos: i, toneIdx: info.tone };
+    }
+  }
+  return null;
+}
+
+// Strip any tone from buffer (keep diacritics, lose tone marks)
+function stripTone(buffer) {
+  const chars = [...buffer];
+  for (let i = 0; i < chars.length; i++) {
+    if (ALL_VOWEL_CHARS.has(chars[i])) {
+      const info = findVowelInfo(chars[i]);
+      if (info && info.tone > 0) {
+        const table = info.isUpper ? UPPER_VOWELS : VOWELS;
+        chars[i] = table[info.base][0];
+      }
+    }
+  }
+  return chars.join('');
+}
+
+// Vietnamese phonotactic fix, table-driven from NUCLEUS_NORMALIZE: the horn has
+// to sit where the spelling puts it, so "đưoc"/"đuợc" both become "được".
+// WHETHER a rime has to wait for the next character is read off that entry's
+// `lazy` flag (the reasoning is at the table) — this function does not know, and
+// does not need to know, which rime is which.
+function normalizeNucleus(buffer) {
+  const chars = [...buffer];
+  if (chars.length < 2) return buffer;
+  let changed = false;
+  for (let i = 0; i <= chars.length - 2; i++) {
+    const b0 = vowelBase(chars[i]);
+    const b1 = vowelBase(chars[i + 1]);
+    if (b0 === '' || b1 === '') continue;
+    const shape = b0 + b1;
+    if (!(shape in NUCLEUS_NORMALIZE)) continue;
+    const rule = NUCLEUS_NORMALIZE[shape];
+    // The rime sits at the end of the buffer: it may still be a legal form.
+    if (rule.lazy && i + 2 === chars.length) continue;
+    setVowelBaseAt(chars, i, rule.fixed[0]);
+    setVowelBaseAt(chars, i + 1, rule.fixed[1]);
+    changed = true;
+  }
+  if (!changed) return buffer;
+  let out = chars.join('');
+  // A changed rime moves the tone with it: "ngừo" + i must give "người", not
+  // "ngừơi". Re-place the tone with the standard rule.
+  const cur = getCurrentTone(out);
+  if (cur) {
+    const retoned = applyToneToBuffer(stripTone(out), cur.toneIdx);
+    if (retoned !== null) out = retoned;
+  }
+  return out;
+}
+
+// Is this vowel cluster already the TARGET form of a NUCLEUS_NORMALIZE entry —
+// i.e. the horn is where the spelling wants it and there is nothing left to fix?
+// Read straight off the table instead of re-typing "ươ" here, so a new rime in
+// the table makes this correct for free.
+function isNormalizedNucleus(shape) {
+  for (const rule of Object.values(NUCLEUS_NORMALIZE)) {
+    if (rule.fixed === shape) return true;
+  }
+  return false;
+}
+
+// The vowel cluster at the END of the buffer: { start, shape }, where shape is
+// the run's bare base letters (tone stripped, lowercase). shape === '' when the
+// last character is not a vowel.
+function trailingNucleus(chars) {
+  let start = chars.length;
+  for (let i = chars.length - 1; i >= 0; i--) {
+    if (vowelBase(chars[i]) === '') break;
+    start = i;
+  }
+  let shape = '';
+  for (let i = start; i < chars.length; i++) shape += vowelBase(chars[i]);
+  return { start, shape };
+}
+
+// Longest SUFFIX of the cluster shape present in HORN_NUCLEUS ('' if none).
+function matchHornNucleus(shape) {
+  for (let len = shape.length; len >= 1; len--) {
+    const sfx = shape.slice(shape.length - len);
+    if (sfx in HORN_NUCLEUS) return sfx;
+  }
+  return '';
+}
+
+// Apply the 'w' modifier to chars[i] in place, returning true if it applied.
+// Resolves the BASE letter first, so an already-toned vowel still qualifies and
+// keeps its tone: "ọ" -> "ợ", "ụ" -> "ự", "à" -> "ằ". That is what makes the
+// tone-before-modifier order work ("dduojcw" -> được).
+function applyWModifierAt(chars, i) {
+  const info = findVowelInfo(chars[i]);
+  if (!info) return false;
+  const baseLower = info.base.toLowerCase();
+  if (!(baseLower in W_MODIFIER)) return false;
+  return setVowelBaseAt(chars, i, W_MODIFIER[baseLower]);
+}
+
+// True iff the PREVIOUS keystroke produced "ư"/"Ư" via the Unikey "w"-only
+// shortcut (empty or consonant-only buffer + "w"). Needed so "ww" escapes to "w"
+// instead of "uw": there is no implicit "u" to restore when the "ư" did not come
+// from a "uw" pair. Reset at the top of every transform(), re-armed only by the
+// two shortcut paths.
+let lastWWasShortcut = false;
+
+// Clear the engine's cross-keystroke state, so an independent typing run starts
+// from a known point. For TEST HARNESSES (runSelfTests, check-parity.mjs) which
+// replay many sequences through one engine instance.
+//
+// The typing UI deliberately does NOT call this when the syllable ends, because
+// VietDvorak.ahk does not either: its ResetBuffer() clears g_buffer only. The
+// flag is unobservable across a syllable break anyway — it is read only when the
+// buffer is non-empty, and after a break the buffer is empty.
+function resetTelexState() {
+  lastWWasShortcut = false;
+}
+
+function transform(buffer, key) {
+  const lower = key.toLowerCase();
+  const isUpperKey = key !== lower;
+
+  const prevWasShortcut = lastWWasShortcut;
+  lastWWasShortcut = false;
+
+  // --- Late 'w' modifier paths ---
+  // - "aw"/"ow"/"uw" -> ă/ơ/ư (via DIACRITIC_PAIRS, falls through to pair logic)
+  // - vowel clusters in HORN_NUCLEUS ("uu" -> "ưu", "uou" -> "ươu")
+  // - "uoiw" -> "uơi" -> "ươi" (via normalizeNucleus)
+  // - Unikey shortcut: w on an empty or consonant-only buffer -> "ư" ("chw" -> "chư")
+  if (lower === 'w') {
+    if (buffer.length === 0) {
+      lastWWasShortcut = true;
+      return isUpperKey ? 'Ư' : 'ư';
+    }
+    const chars = [...buffer];
+    const lastLo = chars[chars.length - 1].toLowerCase();
+
+    // The horn applies to the WHOLE trailing cluster, not to one character: for
+    // "uu"/"uou" it does not land on the last vowel ("ưu" not "uư", "ươu" not
+    // "uoư"). Table lookup instead of per-case special-casing, so "huouw" ->
+    // hươu and "ruouwj" -> rượu behave exactly like "luuwj". setVowelBaseAt
+    // keeps any existing tone, so typing the tone FIRST ("luujw" -> lựu,
+    // "ruoujw" -> rượu) gives the same result as typing it last.
+    // This must run BEFORE the immediatePair check below, which would otherwise
+    // swallow "huou" + w into the plain "uw" pair.
+    const nuc = trailingNucleus(chars);
+    const hornShape = matchHornNucleus(nuc.shape);
+    if (hornShape !== '') {
+      const horned = HORN_NUCLEUS[hornShape];
+      const offset = nuc.start + nuc.shape.length - hornShape.length;
+      for (let k = 0; k < horned.length; k++) {
+        setVowelBaseAt(chars, offset + k, horned[k]);
+      }
+      return normalizeNucleus(chars.join(''));  // 'w' consumed
+    }
+
+    // The rime is ALREADY in the horned form a NUCLEUS_NORMALIZE entry targets
+    // ("đưo" was just normalised to "đươ"), so this "w" has nothing left to do —
+    // the request for a horn is already satisfied. Swallow it, and do NOT let it
+    // fall through to the escape path below: an escape may only undo a horn the
+    // USER typed, never one the engine inserted.
+    //   "dduwowngf" -> đường   (the second w is redundant, not an undo command)
+    // "oww"/"uww" are untouched: their trailing cluster is "ơ"/"ư", a target form
+    // of DIACRITIC_PAIRS that the user typed, so the escape still runs there.
+    if (isNormalizedNucleus(nuc.shape)) return buffer;
+
+    // If immediate pair (aw/ow/uw) would form, fall through to normal pair logic.
+    // If NOT, scan backwards for a modifiable vowel and apply there.
+    const immediatePair = (lastLo + 'w');
+    if (!(immediatePair in DIACRITIC_PAIRS)) {
+      for (let i = chars.length - 1; i >= 0; i--) {
+        if (applyWModifierAt(chars, i)) {
+          return normalizeNucleus(chars.join(''));  // 'w' consumed
+        }
+      }
+      // No modifiable vowel. Pair-escape first: "ư" + w -> "uw" (literal escape).
+      // Exception: if the trailing "ư"/"Ư" came from the Unikey "w"-only shortcut
+      // on the previous keystroke (not from a "uw" pair), there is no implicit
+      // "u" to restore — escape to the literal "w" alone.
+      //   "ww"   -> "w"   (not "uw")
+      //   "chww" -> "chw" (not "chuw")
+      const lastChar = chars[chars.length - 1];
+      const escapeInfo = PAIR_ESCAPE[lastChar];
+      if (escapeInfo && escapeInfo.secondKey === lower) {
+        const head = chars.slice(0, -1).join('');
+        return prevWasShortcut ? head + key : head + escapeInfo.firstChar + key;
+      }
+      // Unikey shortcut: buffer has no vowels (consonants only) -> append "ư".
+      // A leading "gi" is an initial consonant cluster (like "qu"), so its "i" is
+      // skipped when scanning — "giw" -> "giư" (giữ, giường, ...). Skipped when
+      // any other vowel is present, so "câw" still yields a literal "câw".
+      let scanStart = 0;
+      if (chars.length >= 2
+          && chars[0].toLowerCase() === 'g'
+          && chars[1].toLowerCase() === 'i') {
+        scanStart = 2;
+      }
+      let hasVowel = false;
+      for (let i = scanStart; i < chars.length; i++) {
+        if (findVowelInfo(chars[i])) { hasVowel = true; break; }
+      }
+      if (!hasVowel) {
+        lastWWasShortcut = true;
+        return buffer + (isUpperKey ? 'Ư' : 'ư');
+      }
+      // Has a non-modifiable vowel — fall through to the literal-w append
+    }
+  }
+
+  // --- Tone key path ---
+  if (lower in TONE_KEYS) {
+    const toneIdx = TONE_KEYS[lower];
+    const chars = [...buffer];
+    const targetIdx = findToneTarget(chars);
+    if (targetIdx >= 0) {
+      const info = findVowelInfo(chars[targetIdx]);
+      if (info && info.tone === toneIdx) {
+        // ESCAPE: same tone key pressed twice -> strip tone AND append key literally
+        // ("ass" -> "as", "aff" -> "af", etc.)
+        const table = info.isUpper ? UPPER_VOWELS : VOWELS;
+        chars[targetIdx] = table[info.base][0];
+        return applyDiacriticPair(chars.join('') + key);
+      }
+    }
+    const toned = applyToneToBuffer(buffer, toneIdx);
+    if (toned !== null) return toned;
+  }
+
+  // --- Diacritic-pair escape path ---
+  // If last char is a no-tone pair-result and the new key is the pair's
+  // second trigger, undo the diacritic and append the key as a literal.
+  //   "oww" -> "ow",  "aaa" -> "aa",  "ddd" -> "dd"
+  if (buffer.length > 0) {
+    const chars = [...buffer];
+    const lastChar = chars[chars.length - 1];
+    const escapeInfo = PAIR_ESCAPE[lastChar];
+    if (escapeInfo && escapeInfo.secondKey === lower) {
+      chars[chars.length - 1] = escapeInfo.firstChar;
+      // Return without re-running pair detection (it would just re-form the pair)
+      return chars.join('') + key;
+    }
+  }
+
+  // --- Normal append path (with smart tone migration if a tone exists) ---
+  const existing = getCurrentTone(buffer);
+  let result;
+  if (existing) {
+    // Strip tone first, then check pair on (stripped + key), then re-apply tone.
+    // Order matters: this lets "afa" form "ầ" (tone + diacritic combine smartly).
+    const stripped = stripTone(buffer);
+    result = applyDiacriticPair(stripped + key);
+    const reapplied = applyToneToBuffer(result, existing.toneIdx);
+    if (reapplied !== null) result = reapplied;
+  } else {
+    result = applyDiacriticPair(buffer + key);
+  }
+  return normalizeNucleus(result);
+}
+
+// END TELEX ENGINE
+
+// ============================================================================
+// REVERSE: Vietnamese char -> Telex key sequence (for hint display)
+// ============================================================================
+
+// Build map: composed char -> { base, modifier, tone }
+const REVERSE_VOWEL = {};
+const VOWEL_BASE_TO_KEYS = {
+  'a': { base: 'a', mod: '' },
+  'ă': { base: 'a', mod: 'w' },
+  'â': { base: 'a', mod: 'a' },
+  'e': { base: 'e', mod: '' },
+  'ê': { base: 'e', mod: 'e' },
+  'i': { base: 'i', mod: '' },
+  'o': { base: 'o', mod: '' },
+  'ô': { base: 'o', mod: 'o' },
+  'ơ': { base: 'o', mod: 'w' },
+  'u': { base: 'u', mod: '' },
+  'ư': { base: 'u', mod: 'w' },
+  'y': { base: 'y', mod: '' }
+};
+const TONE_TO_KEY = ['', 's', 'f', 'r', 'x', 'j'];
+
+for (const [bv, tones] of Object.entries(VOWELS)) {
+  const { base, mod } = VOWEL_BASE_TO_KEYS[bv];
+  tones.forEach((ch, i) => {
+    REVERSE_VOWEL[ch] = { base, mod, tone: TONE_TO_KEY[i] };
+  });
+}
+for (const [bv, tones] of Object.entries(UPPER_VOWELS)) {
+  const { base, mod } = VOWEL_BASE_TO_KEYS[bv.toLowerCase()];
+  tones.forEach((ch, i) => {
+    REVERSE_VOWEL[ch] = { base: base.toUpperCase(), mod, tone: TONE_TO_KEY[i] };
+  });
+}
+
+// Early-tone spelling: the tone key right after the vowel it belongs to.
+//   mới -> mowsi     người -> nguwowfi     tiếng Việt -> tieesng Vieejt
+function wordToTelex(word) {
+  let out = '';
+  for (const ch of word) {
+    if (ch in REVERSE_VOWEL) {
+      const { base, mod, tone } = REVERSE_VOWEL[ch];
+      out += base + mod + tone;
+    } else if (ch === 'đ') {
+      out += 'dd';
+    } else if (ch === 'Đ') {
+      out += 'Dd';
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+// Late-tone spelling: the tone key at the END of its syllable. This is the order
+// VietDvorak.ahk was designed around (see its header — the tone keys sit where
+// they do BECAUSE they are typed last), so the trainer must show it too instead
+// of presenting the early-tone spelling as if it were the only way.
+//   mới -> mowis     người -> nguwowif     tiếng Việt -> tieengs Vieetj
+// The engine accepts both, and every order in between; these two are just the
+// endpoints, printed as a hint.
+function wordToTelexLateTone(word) {
+  let out = '';
+  let pendingTone = '';   // tone of the syllable being spelled — emitted at its end
+  for (const ch of word) {
+    if (ch in REVERSE_VOWEL) {
+      const { base, mod, tone } = REVERSE_VOWEL[ch];
+      out += base + mod;
+      if (tone) pendingTone = tone;
+    } else if (ch === 'đ') {
+      out += 'dd';
+    } else if (ch === 'Đ') {
+      out += 'Dd';
+    } else if (isSyllableChar(ch)) {
+      out += ch;
+    } else {
+      // Anything that is not a letter ends the syllable (same rule as
+      // isResetChar) — flush the tone before it.
+      out += pendingTone + ch;
+      pendingTone = '';
+    }
+  }
+  return out + pendingTone;
+}
+
+// The "Gõ chuỗi:" hint. Both orders when they differ, one string when they agree
+// (toneless words, and words whose tone already sits on the last vowel).
+function targetKeyHint(word) {
+  const early = wordToTelex(word);
+  const late = wordToTelexLateTone(word);
+  return early === late ? early : `${early}  hoặc  ${late}`;
+}
+
+// ============================================================================
+// WORD LISTS
+// ============================================================================
+
+const WORD_LISTS = {
+  easy: [
+    'tôi', 'bạn', 'nhà', 'ăn', 'đi', 'học', 'làm', 'đẹp', 'vui', 'mới',
+    'cũ', 'hỏi', 'nghe', 'nói', 'đọc', 'viết', 'mẹ', 'bố', 'em', 'anh',
+    'chị', 'cây', 'hoa', 'lá', 'mưa', 'nắng', 'gió', 'ngày', 'đêm', 'sáng'
+  ],
+  medium: [
+    'tiếng Việt', 'người Việt', 'học sinh', 'đại học', 'gia đình', 'bạn bè',
+    'thầy giáo', 'cô giáo', 'mùa xuân', 'mùa hạ', 'mùa thu', 'mùa đông',
+    'quê hương', 'đất nước', 'thành phố', 'làng quê', 'cuộc sống', 'tình yêu',
+    // Tone placement follows TONE_PLACEMENT_MODERN (khoẻ, not khỏe) — a target
+    // spelled the other way can never be completed, because the engine will
+    // never produce it. See telex-conformance.txt line "khoer -> khoẻ".
+    'sức khoẻ', 'hạnh phúc', 'thời gian', 'tương lai'
+  ],
+  hard: [
+    'Nguyễn', 'đường', 'thường', 'người', 'ngược', 'quyển', 'nghiêng', 'khuyến',
+    'thuyền', 'nguyên', 'nghiệp', 'khuỷu', 'truyền', 'nguyễn', 'thưởng', 'tưởng',
+    'những', 'cường', 'phượng', 'huyền', 'duyệt', 'khuya'
+  ],
+  sentence: [
+    'Tôi đang học tiếng Việt.',
+    'Hôm nay trời rất đẹp.',
+    'Việt Nam là đất nước tôi yêu.',
+    'Bạn có khoẻ không?',
+    'Cám ơn bạn rất nhiều.',
+    'Chúc mừng năm mới.',
+    'Phở là món ăn truyền thống của Việt Nam.',
+    'Hà Nội là thủ đô của Việt Nam.',
+    'Tôi muốn uống một ly cà phê sữa đá.',
+    'Người Việt Nam rất thân thiện và mến khách.'
+  ]
+};
+
+// ============================================================================
+// PRACTICE STATE & UI
+// ============================================================================
+
+const state = {
+  mode: 'practice',     // 'practice' | 'free'
+  level: 'easy',
+  wordIdx: 0,
+  words: [],
+  buffer: '',           // current syllable buffer
+  committed: '',        // text before current syllable
+  // The keys that MADE (committed, buffer) — see the keystroke-log block. The
+  // text is derived from this, never the other way round, which is what lets
+  // Backspace undo a keystroke instead of a character.
+  keys: [],
+  startTime: null,
+  // The stats bar's measurement window — opened together on the first keystroke,
+  // shut by `startTime = null`. See recordKeystroke.
+  //
+  // The ACCURACY pair is (unitAttempts, errorChars) and BOTH count unit-attempts;
+  // totalChars is not part of it and never was meant to be. It counts characters,
+  // which is what a RATE is made of, and nothing else reads it.
+  totalChars: 0,        // characters produced — WPM only
+  unitAttempts: 0,      // attempts made      — accuracy denominator
+  errorChars: 0,        // attempts broken    — accuracy numerator
+
+  // The four settings below are DERIVED from their DOM controls at init and on
+  // every change (see syncSettingsFromControls) — the values here are only the
+  // shape of the object, never the source of truth.
+  showHint: true,
+  autoAdvance: true,
+  showKb: true,
+  showNext: true
+};
+
+// ============================================================================
+// VIRTUAL DVORAK KEYBOARD
+// ============================================================================
+
+// Each entry: {dv: <char produced under Dvorak layout>, qw: <physical key per QWERTY label>}
+const KEYBOARD_LAYOUT = [
+  // Number row — same in Dvorak EXCEPT - and = positions become [ and ]
+  [
+    {dv: '`', qw: '`'}, {dv: '1', qw: '1'}, {dv: '2', qw: '2'}, {dv: '3', qw: '3'},
+    {dv: '4', qw: '4'}, {dv: '5', qw: '5'}, {dv: '6', qw: '6'}, {dv: '7', qw: '7'},
+    {dv: '8', qw: '8'}, {dv: '9', qw: '9'}, {dv: '0', qw: '0'},
+    {dv: '[', qw: '-'},  // physical "-" key produces "[" on Dvorak
+    {dv: ']', qw: '='}
+  ],
+  // Top row (QWERTY Q .. \)
+  [
+    {dv: "'", qw: 'q'}, {dv: ',', qw: 'w'}, {dv: '.', qw: 'e'}, {dv: 'p', qw: 'r'},
+    {dv: 'y', qw: 't'}, {dv: 'f', qw: 'y'}, {dv: 'g', qw: 'u'}, {dv: 'c', qw: 'i'},
+    {dv: 'r', qw: 'o'}, {dv: 'l', qw: 'p'},
+    {dv: '/', qw: '['}, {dv: '=', qw: ']'}, {dv: '\\', qw: '\\'}
+  ],
+  // Home row (QWERTY A .. ')
+  [
+    {dv: 'a', qw: 'a'}, {dv: 'o', qw: 's'}, {dv: 'e', qw: 'd'}, {dv: 'u', qw: 'f'},
+    {dv: 'i', qw: 'g'}, {dv: 'd', qw: 'h'}, {dv: 'h', qw: 'j'}, {dv: 't', qw: 'k'},
+    {dv: 'n', qw: 'l'}, {dv: 's', qw: ';'}, {dv: '-', qw: "'"}
+  ],
+  // Bottom row (QWERTY Z .. /)
+  [
+    {dv: ';', qw: 'z'}, {dv: 'q', qw: 'x'}, {dv: 'j', qw: 'c'}, {dv: 'k', qw: 'v'},
+    {dv: 'x', qw: 'b'}, {dv: 'b', qw: 'n'}, {dv: 'm', qw: 'm'},
+    {dv: 'w', qw: ','}, {dv: 'v', qw: '.'}, {dv: 'z', qw: '/'}
+  ],
+  // Space. A keyboard diagram without a space bar is odd on its own, but the
+  // real cost was elsewhere: HINT_CANDIDATE_KEYS is read off this table, so the
+  // hint could never propose a space and went dark at every syllable boundary of
+  // a multi-syllable target — reading as "you went wrong" at the one moment the
+  // input was certainly right.
+  [
+    {dv: ' ', qw: ' ', label: 'space', wide: true}
+  ]
+];
+
+function getKeyRole(dv) {
+  if ('sfrxj'.includes(dv)) return 'tone';
+  if ('aeiouy'.includes(dv)) return 'vowel';
+  if (dv === 'w' || dv === 'd') return 'mod';
+  return null;
+}
+
+// 8 home-position keys where fingers rest in Dvorak touch typing:
+//   left  hand: a (pinky) o (ring) e (middle) u (index)
+//   right hand: h (index) t (middle) n (ring) s (pinky)
+const HOME_KEYS = new Set(['a', 'o', 'e', 'u', 'h', 't', 'n', 's']);
+
+// Keys the next-key hint is allowed to propose: exactly the characters the
+// virtual keyboard can highlight, read off the layout itself.
+const HINT_CANDIDATE_KEYS = KEYBOARD_LAYOUT.flat().map(k => k.dv);
+
+// What each key produces WITH Shift. A letter shifts to its capital and JS
+// already knows that; these do not, and the hint has to be able to probe them —
+// without "?" it goes dark on the last character of "Bạn có khoẻ không?", the
+// same "you went wrong" at a moment the typist is right that the missing space
+// key used to cause at every syllable boundary.
+const SHIFTED_KEYS = {
+  '`': '~', '1': '!', '2': '@', '3': '#', '4': '$', '5': '%', '6': '^',
+  '7': '&', '8': '*', '9': '(', '0': ')', '[': '{', ']': '}',
+  "'": '"', ',': '<', '.': '>', '/': '?', '=': '+', '\\': '|',
+  '-': '_', ';': ':'
+};
+
+function shiftedKey(ch) {
+  return SHIFTED_KEYS[ch] || ch.toUpperCase();
+}
+
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  KEYBOARD_LAYOUT.forEach((row, rowIdx) => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'kb-row r' + rowIdx;
+    for (const k of row) {
+      const keyEl = document.createElement('div');
+      keyEl.className = 'kb-key';
+      if (k.wide) keyEl.classList.add('wide');
+      keyEl.dataset.char = k.dv;
+      const role = getKeyRole(k.dv);
+      if (role) keyEl.classList.add('role-' + role);
+      if (HOME_KEYS.has(k.dv)) keyEl.classList.add('home');
+      const dv = document.createElement('span');
+      dv.className = 'kb-dv';
+      // `label` is for keys whose character has nothing to draw (space).
+      dv.textContent = k.label || k.dv;
+      keyEl.appendChild(dv);
+      // Only show QWERTY label when it differs from Dvorak char
+      if (k.qw !== k.dv) {
+        const qw = document.createElement('span');
+        qw.className = 'kb-qw';
+        qw.textContent = k.qw;
+        keyEl.appendChild(qw);
+      }
+      rowEl.appendChild(keyEl);
+    }
+    kb.appendChild(rowEl);
+  });
+}
+
+function findKbKey(ch) {
+  const keys = document.querySelectorAll('.kb-key');
+  for (const k of keys) {
+    if (k.dataset.char === ch) return k;
+  }
+  return null;
+}
+
+let pressTimer = null;
+function flashKey(ch) {
+  // Highlight whichever key produces this char (lowercase since keyboard shows lowercase)
+  const key = findKbKey(ch.toLowerCase());
+  if (!key) return;
+  document.querySelectorAll('.kb-key.pressed').forEach(el => el.classList.remove('pressed'));
+  key.classList.add('pressed');
+  if (pressTimer) clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => key.classList.remove('pressed'), 180);
+}
+
+// Run one candidate key through the real input path WITHOUT disturbing anything,
+// and return the text it would produce.
+//
+// transform() carries one bit of cross-keystroke state (lastWWasShortcut, which
+// makes "ww" -> "w"). A probe must start from the live value and put it back, or
+// probing would change what the user's next REAL keystroke does.
+function probeKey(key) {
+  const saved = lastWWasShortcut;
+  const next = applyKey(state.committed, state.buffer, key);
+  lastWWasShortcut = saved;
+  return next.committed + next.buffer;
+}
+
+// Highlight every key that can legally come next — not "the" next key.
+//
+// The old version compared wordToTelex(typed) against wordToTelex(target) as a
+// string prefix, which only ever described ONE spelling: tone key immediately
+// after its vowel. Telex accepts the tone anywhere in the syllable (and the w/
+// diacritic keys likewise), and VietDvorak is built for typists who put the tone
+// last — so that test failed on the project's own house style and the hint died
+// mid-word, permanently.
+//
+// There is no need to enumerate the legal orders: ask the engine. Every key the
+// keyboard can show is replayed through the same code the keydown handler uses,
+// and it is a valid next key iff the text it produces is still a half-typed form
+// of the target. Whatever spelling ORDER transform() accepts, the hint accepts.
+//
+// The predicate is the one the keydown handler scores with, on the text the same
+// applyKey() produces — so a key this lights up can never be counted an error.
+// Each key is probed twice, bare and with Shift, because matching is
+// case-sensitive: on a target like "Việt" the bare "v" leads to a state no
+// keystroke can finish, and only the shifted one is progress. A key that is
+// correct ONLY shifted is marked as such (the ⇧ badge) — lighting it plain would
+// swap one silent dead end for another.
+function updateNextKeyHint() {
+  document.querySelectorAll('.kb-key.next-hint').forEach(el => {
+    el.classList.remove('next-hint', 'next-hint-shift');
+  });
+  if (!state.showNext) return;
+  if (state.mode !== 'practice') return;  // no target in free mode
+  const target = state.words[state.wordIdx];
+  if (!target) return;
+  for (const key of HINT_CANDIDATE_KEYS) {
+    const shift = shiftedKey(key);
+    const bareOk = isComposingToward(probeKey(key), target);
+    const shiftOk = !bareOk && shift !== key
+      && isComposingToward(probeKey(shift), target);
+    if (!bareOk && !shiftOk) continue;
+    const el = findKbKey(key);
+    if (!el) continue;
+    el.classList.add('next-hint');
+    if (shiftOk) el.classList.add('next-hint-shift');
+  }
+}
+
+const els = {
+  display: document.getElementById('input-display'),
+  targetWord: document.getElementById('target-word'),
+  targetKeys: document.getElementById('target-keys'),
+  feedback: document.getElementById('feedback'),
+  wpm: document.getElementById('wpm'),
+  acc: document.getElementById('acc'),
+  wordnum: document.getElementById('wordnum'),
+  wordtotal: document.getElementById('wordtotal'),
+  skip: document.getElementById('skip'),
+  reset: document.getElementById('reset'),
+  level: document.getElementById('level'),
+  showHint: document.getElementById('show-hint'),
+  autoAdvance: document.getElementById('auto-advance'),
+  showKb: document.getElementById('show-kb'),
+  showNext: document.getElementById('show-next'),
+  kbSection: document.getElementById('kb-section'),
+  targetHint: document.querySelector('.target-hint'),
+  btnCopy: document.getElementById('btn-copy'),
+  btnClear: document.getElementById('btn-clear'),
+  charCount: document.getElementById('char-count'),
+  copyToast: document.getElementById('copy-toast'),
+  toggleRow: document.querySelector('.toggle-row'),
+  imeWarning: document.getElementById('ime-warning'),
+  imeDismiss: document.getElementById('ime-dismiss')
+};
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const DEFAULT_LEVEL = 'easy';
+
+function loadLevel(level) {
+  // The <select> is the source of truth for the level, but only for values we
+  // actually have a word list for. Fall back and correct the control, so the two
+  // never disagree about what is being practised.
+  //
+  // A level that EXISTS but is empty is the same thing to a typist — there is
+  // nothing to practise — and it used to be a different thing to the program: the
+  // fallback did not catch it, loadCurrentWord() handed `undefined` to the hint
+  // speller, and the trainer died on an opaque TypeError from inside a for..of
+  // over a word that was not there. checkWordListsTypeable() fails on an empty
+  // level too, so this is the second line rather than the first.
+  if (!(level in WORD_LISTS) || WORD_LISTS[level].length === 0) {
+    level = DEFAULT_LEVEL;
+    els.level.value = level;
+  }
+  state.level = level;
+  state.words = shuffle(WORD_LISTS[level]);
+  state.wordIdx = 0;
+  els.wordtotal.textContent = state.words.length;
+  loadCurrentWord();
+}
+
+// `message`/`cls` let a CALLER say something about the transition it just made
+// ("lap finished", "skipped"). Writing that message before calling in here and
+// letting this function overwrite it in the same tick is how those two messages
+// became unreachable code: the browser never painted the intermediate value.
+function loadCurrentWord(message, cls) {
+  cancelAutoAdvance();
+  clearTyped();
+  const word = state.words[state.wordIdx];
+  // There is no word to practise, and every line below this one would fail in a
+  // way that names something else: targetKeyHint() throws out of a for..of over
+  // `undefined` inside the hint speller, three frames from the actual cause. Say
+  // the cause. Reaching here means every level is empty, which the word-list
+  // guard in the self-test (and check-parity.mjs, which runs it) fails on first.
+  if (typeof word !== 'string') {
+    throw new Error(
+      `WORD_LISTS["${state.level}"] has no word at index ${state.wordIdx} ` +
+      `(${state.words.length} in the list) — the level is empty.`);
+  }
+  els.targetWord.textContent = word;
+  els.targetKeys.textContent = targetKeyHint(word);
+  els.wordnum.textContent = state.wordIdx + 1;
+  updateDisplay();
+  updateNextKeyHint();
+  els.feedback.textContent = message || 'Bắt đầu gõ...';
+  els.feedback.className = 'feedback' + (cls ? ' ' + cls : '');
+}
+
+function nextWord(message, cls) {
+  state.wordIdx++;
+  if (state.wordIdx >= state.words.length) {
+    state.words = shuffle(state.words);
+    state.wordIdx = 0;
+    // Finishing a lap outranks whatever the caller wanted to say.
+    message = '🎉 Hoàn thành 1 lượt! Bắt đầu lại với thứ tự mới.';
+    cls = 'good';
+  }
+  loadCurrentWord(message, cls);
+}
+
+function getCurrentText() {
+  return state.committed + state.buffer;
+}
+
+function updateDisplay() {
+  if (state.mode === 'free') {
+    updateFreeDisplay();
+  } else {
+    updatePracticeDisplay();
+  }
+}
+
+function updateFreeDisplay() {
+  const current = getCurrentText();
+  let html = '';
+  if (current.length === 0) {
+    html = '<span class="placeholder">Bắt đầu gõ tiếng Việt tự do...</span><span class="cursor"></span>';
+  } else {
+    html = escapeHtml(current) + '<span class="cursor"></span>';
+  }
+  els.display.innerHTML = html;
+  els.display.classList.remove('match', 'partial-good', 'bad');
+  // Char count
+  els.charCount.textContent = `${[...current].length} ký tự`;
+}
+
+// The colours the typed text is painted in. One place, so "what does red mean"
+// is answerable by reading one list — and each entry says WHEN it applies,
+// because three of them differ only in what the typist can do about it.
+const PAINT = {
+  // Typed, and exactly the character the target has there.
+  right: (s) => `<span style="color: var(--good)">${escapeHtml(s)}</span>`,
+  // Typed, right letter, right case, diacritic or tone not there YET — and the
+  // "yet" is a fact about the enclosing UNIT rather than about the character:
+  // this is painted only inside a unit the scorer still calls UNIT_OK, i.e. one
+  // the engine can still finish. In a unit that has already gone wrong the
+  // identical character is not waiting for anything, and is painted below.
+  pending: (s) => `<span style="color: var(--fg)">${escapeHtml(s)}</span>`,
+  // Typed and wrong, and ONE keystroke puts it back — a wrong tone, in a unit the
+  // scorer calls UNIT_WRONG. Amber and not red, matching the border, which stays
+  // neutral here deliberately (see the MATCHING block): there is nothing to undo,
+  // the tone key re-picks its host vowel and replaces the tone in place.
+  repairable: (s) => `<span style="color: var(--warn); text-decoration: underline">${escapeHtml(s)}</span>`,
+  // Typed, wrong, and no keystroke can take it back. This is the character-level
+  // half of what makes the border red.
+  wrong: (s) => `<span style="color: var(--bad); text-decoration: underline">${escapeHtml(s)}</span>`,
+  // Typed past the end of the target span this unit was paired with.
+  surplus: (s) => `<span style="color: var(--bad)">${escapeHtml(s)}</span>`,
+  // NOT typed, and no longer typeable here: the target's own character shown in
+  // the hole it should have filled. A syllable closed early ("nă " for "năm ")
+  // has every character it did type correct, so this is the only place its
+  // mistake can be shown at all. Dimmer and dashed, so it cannot be read as
+  // something the typist put there.
+  missing: (s) => `<span style="color: var(--bad); opacity: 0.75; text-decoration: underline dashed">${escapeHtml(s)}</span>`,
+  // Not typed yet, still ahead of the caret.
+  owed: (s) => `<span style="color: var(--muted); opacity: 0.4">${escapeHtml(s)}</span>`,
+};
+
+// One typed character against the character its own PAIRED target unit has in
+// the same place, plus the VERDICT of the unit around it — because "is this mark
+// missing or dead?" is a question about the unit, and the character cannot answer
+// it. stripChar() folds a vowel's tone and diacritic onto the bare letter, so
+// `stripChar(c) === stripChar(w)` says "same letter, same case, the marks differ"
+// and nothing more; which of the three that is depends entirely on what the
+// scorer said about the unit.
+//
+// That is the whole of the second defect this replaces: pending was painted on
+// the strength of the character alone, so a diacritic that was never going to
+// arrive (its syllable already closed, its syllable already dead) was drawn in
+// the same neutral as one still on its way, and a tone that was typed and WRONG
+// was drawn in the same neutral as one not typed at all — the readout said 0%,
+// the notice said "press Backspace", and not one character on the screen was
+// marked.
+function charVerdict(c, w, status) {
+  if (c === w) return 'right';
+  // A different bare letter, or the same letter in the other case. Neither is
+  // ever repairable in place — transform() only appends, or rewrites a character
+  // keeping its bare letter and case — so this is red wherever it appears.
+  if (stripChar(c) !== stripChar(w)) return 'wrong';
+  if (status === UNIT_OK) return 'pending';
+  return status === UNIT_WRONG ? 'repairable' : 'wrong';
+}
+
+function updatePracticeDisplay() {
+  const target = state.words[state.wordIdx] || '';
+  const current = getCurrentText();
+
+  if (current.length === 0) {
+    els.display.innerHTML = `<span class="placeholder">${escapeHtml(target)}</span><span class="cursor"></span>`;
+    els.display.classList.remove('match', 'partial-good', 'bad');
+    els.display.classList.add('partial-good');
+    setStuckNotice(false);
+    cancelAutoAdvance();
+    return;
+  }
+
+  // ONE walk, and the SAME walk the score and the border are read from — see the
+  // pairing comment. Characters are compared inside a paired unit; which unit is
+  // paired with which is decided first, by ordinal, exactly as the scorer decides
+  // it. The version this replaces compared currentChars[i] against
+  // targetChars[i], a fourth answer to a question already answered: after a stray
+  // letter at the front of "Tôi đang học tiếng Việt." it painted 29 of 31
+  // characters red while the readout said 98%, because every character after the
+  // slip had slid one place. Now a length-changing slip reddens the syllable it
+  // broke and nothing else.
+  const steps = unitSteps(current, target, true);
+  const targetChars = [...target];
+  let html = '';
+  let owedFrom = 0;                     // target characters accounted for so far
+
+  steps.forEach((step, s) => {
+    const typed = [...step.typed.join('')];
+    const want = [...step.want.join('')];
+    const last = s === steps.length - 1;   // the step the caret is in
+    owedFrom += want.length;
+    // Does anything printed for this step carry a mark? A step the scorer calls
+    // broken has to be VISIBLY broken, and a step can be broken with every
+    // character it typed correct — see the shortfall below, which is where such a
+    // step is finally marked.
+    let marked = false;
+    for (let i = 0; i < typed.length; i++) {
+      const c = typed[i];
+      if (i >= want.length) { html += PAINT.surplus(c); marked = true; continue; }
+      const verdict = charVerdict(c, want[i], step.status);
+      if (verdict === 'wrong' || verdict === 'repairable') marked = true;
+      html += PAINT[verdict](c);
+    }
+    // The characters this step is SHORT of. THREE different facts about them, so
+    // three paints — the version this replaces knew only the first, which is how
+    // a step the scorer had already charged an error for could print nothing but
+    // green inside a red border:
+    //
+    //   ahead of the caret   not typed yet, and that is all. Only the LAST step
+    //                        can be short this way: every earlier step is closed,
+    //                        and a closed step is UNIT_OK only when it equals its
+    //                        target exactly (see unitStatus), so an earlier step
+    //                        that is short is an earlier step that is broken.
+    //
+    //   closed and broken    the typist has LEFT it, so no keystroke can ever
+    //                        fill the hole: "nă " for "năm " is short an "m" that
+    //                        can never be put there, and every character it did
+    //                        type is correct. Printing nothing for the shortfall
+    //                        painted that syllable entirely green while the border
+    //                        was red, the notice was up and the score had charged
+    //                        an error — the paint saying "all correct" about the
+    //                        exact unit the readout was calling broken.
+    //
+    //   broken, still open,  the break is real but has not shown up in anything
+    //   nothing marked yet   printed, so it is shown on the first character the
+    //                        step is short of. The rest stays owed: this marks the
+    //                        unit, it does not redden the tail.
+    //                        A GUARD, and measured as one: it did not fire once
+    //                        over 47,404 states (84 targets x every slip class at
+    //                        three positions, every intermediate state). It is here
+    //                        because the alternative is to ASSUME that every
+    //                        character-identical prefix of a target syllable is
+    //                        reachable by the engine — true of these word lists,
+    //                        not a property of Telex — and a word added later that
+    //                        broke it would put the all-green-inside-a-red-border
+    //                        defect straight back. The invariant "a broken step is
+    //                        visibly broken" holds by construction with it, and by
+    //                        luck without it.
+    for (let i = typed.length; i < want.length; i++) {
+      const dead = step.status !== UNIT_OK && (!last || (!marked && i === typed.length));
+      if (dead) { html += PAINT.missing(want[i]); marked = true; }
+      else if (last) html += PAINT.owed(want[i]);
+    }
+  });
+  for (let i = owedFrom; i < targetChars.length; i++) html += PAINT.owed(targetChars[i]);
+
+  html += '<span class="cursor"></span>';
+  els.display.innerHTML = html;
+
+  els.display.classList.remove('match', 'partial-good', 'bad');
+  if (current === target) {
+    els.display.classList.add('match');
+    onWordComplete();
+  } else {
+    // "The current word has ended" is DERIVED from the text, in the one place
+    // that already asks whether the text equals the target — so it is retracted
+    // by the same rule that set it. It used to be set here and retracted only by
+    // loading another word, which left Backspace and Escape rewriting the text
+    // while the latch still said "ended": the display went back to showing the
+    // word as the live target, and the next keystroke silently jumped to the NEXT
+    // word and scored itself against that one.
+    // cancelAutoAdvance() rather than `wordEnded = false` because the pending
+    // timer is the OTHER half of the same notion (see its comment): a word that
+    // is no longer finished must not still have a finished word's advance armed,
+    // or backspacing inside the 500 ms window has the word yanked away mid-repair.
+    cancelAutoAdvance();
+    // Red means ONE thing, and it is the thing the scorer means: the target can
+    // no longer be reached from this text. See the MATCHING block for why the
+    // bare-letter test this replaces was not enough, and why an ordinary wrong
+    // tone deliberately does NOT light it up. Read off the SAME steps the paint
+    // above was painted from — one walk, so the border cannot disagree with the
+    // characters it is drawn around.
+    const stuck = steps.some(st => st.status === UNIT_STUCK);
+    els.display.classList.add(stuck ? 'bad' : 'partial-good');
+    setStuckNotice(stuck);
+  }
+}
+
+// A red border says "you cannot get there from here"; it does not say what to do
+// about it. The line below does, because the state it fires in is exactly the
+// one no keystroke can leave — a wrong letter, a printed diacritic, a syllable
+// closed wrong — and a typist who does not know that Backspace is the only way
+// out sits there pressing keys that no longer change the score.
+//
+// It owns exactly its own string: written when stuck, cleared only if the
+// message still IS this one. So it can never eat "✓ Chính xác!", "↷ Bỏ qua" or
+// the end-of-lap line, which are written by their own callers after the display
+// has been updated.
+const STUCK_NOTICE = '⌫ Không gõ tiếp được — nhấn Backspace để sửa';
+
+function setStuckNotice(on) {
+  if (on) {
+    els.feedback.textContent = STUCK_NOTICE;
+    els.feedback.className = 'feedback bad';
+  } else if (els.feedback.textContent === STUCK_NOTICE) {
+    els.feedback.textContent = '';
+    els.feedback.className = 'feedback';
+  }
+}
+
+function setMode(mode) {
+  if (state.mode === mode) return;
+  cancelAutoAdvance();   // a word completed a moment ago must not advance in free mode
+  state.mode = mode;
+  document.body.classList.toggle('mode-free', mode === 'free');
+  document.body.classList.toggle('mode-practice', mode === 'practice');
+
+  // Reset typing state
+  clearTyped();
+
+  // Update mode toggle buttons
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+
+  if (mode === 'free') {
+    els.feedback.textContent = 'Gõ tự do — Backspace để xoá, Esc để xoá hết. Click "Copy" để lấy nội dung.';
+    els.feedback.className = 'feedback';
+  } else {
+    loadCurrentWord();
+  }
+  updateDisplay();
+  updateNextKeyHint();
+}
+
+async function copyContent() {
+  const text = state.committed + state.buffer;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    showCopyToast();
+  } catch (e) {
+    // Fallback for browsers/contexts without clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showCopyToast(); }
+    catch (_) { els.feedback.textContent = 'Browser không cho phép copy — chọn text rồi Ctrl+C'; }
+    document.body.removeChild(ta);
+  }
+}
+
+let toastTimer = null;
+function showCopyToast() {
+  els.copyToast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => els.copyToast.classList.remove('show'), 1400);
+}
+
+function clearContent() {
+  clearTyped();
+  updateDisplay();
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// Strip diacritics AND tones from a character, leaving the bare base letter.
+// Used for tolerant comparison (so 'e' vs 'ế' shows as "in progress" not "wrong").
+function stripChar(ch) {
+  if (ALL_VOWEL_CHARS.has(ch)) {
+    const info = findVowelInfo(ch);
+    if (info) {
+      const base = info.base.toLowerCase();
+      let plain;
+      if (base === 'â' || base === 'ă') plain = 'a';
+      else if (base === 'ê') plain = 'e';
+      else if (base === 'ô' || base === 'ơ') plain = 'o';
+      else if (base === 'ư') plain = 'u';
+      else plain = base;
+      return info.isUpper ? plain.toUpperCase() : plain;
+    }
+  }
+  if (ch === 'đ') return 'd';
+  if (ch === 'Đ') return 'D';
+  return ch;
+}
+
+// ============================================================================
+// MATCHING — the questions the app asks about typed-vs-target text
+// ============================================================================
+// A composing input method does not walk through the target one finished
+// character at a time. Typing "đường" as `dduwowngf` passes through d, đ, đu,
+// đư, đưo, đươ, đươn, đương before it lands. NONE of those is a prefix of
+// "đường", so a prefix test calls a flawless run 6 errors out of 9 keystrokes.
+//
+// So the text is judged UNIT BY UNIT — a unit is one syllable (a run of
+// letters), or one space/punctuation character — and each unit gets one of three
+// verdicts:
+//
+//   UNIT_OK     Nothing wrong has been typed in it and the engine can still
+//               reach the target from it. For a syllable the typist has already
+//               LEFT, "still" is over: it has to equal the target's exactly.
+//
+//   UNIT_WRONG  Scored wrong, but a keystroke can still bring it back — which in
+//               this engine means exactly one thing, a wrong TONE: a tone key
+//               re-picks its host vowel and replaces the tone in place.
+//
+//   UNIT_STUCK  Scored wrong AND unreachable: nothing the typist can press will
+//               undo it. A wrong letter, a wrong case, a diacritic that is
+//               already printed, a "d" that has become "đ", a syllable that was
+//               closed wrong, an overrun.
+//
+// One walk of the text answers all FOUR questions the app asks, so the readout,
+// the border, the colour of the characters and the hint cannot contradict each
+// other. It was three for one round too long: the per-character paint computed a
+// fourth answer of its own, by character index, and after exactly the typo the
+// ordinal pairing was written to fix it reddened 29 of a sentence's 31 characters
+// while the readout said 98%. The paint is a caller of the same walk now — see
+// updatePracticeDisplay and the pairing comment.
+//
+//   SCORING     isComposingToward() — every unit UNIT_OK. An app whose whole
+//               subject is the tone and diacritic keys cannot call a keystroke
+//               correct just because the bare letters still line up:
+//               `dduwowngs` gives "đướng", every base letter of "đường" in place
+//               and the one thing being taught wrong — nor call it correct when
+//               it has walked into a state no key can finish. The next-key hint
+//               runs the same predicate on the text each candidate key would
+//               produce, so the hint can never light a key that scoring then
+//               counts as an error: "which keys make progress" and "was that key
+//               progress" are one question asked a keystroke apart.
+//
+//   THE BORDER  red iff some unit is UNIT_STUCK — iff the target can no longer be
+//               reached from here. It used to be driven by a bare-letter prefix
+//               test (isOnTrack): NECESSARY, but not sufficient. It said yes to
+//               "đưô" for "đường", which the engine can never finish, so a state
+//               like that was scored an error while the box stayed clean and the
+//               only feedback a stranded typist got was the accuracy digit
+//               moving — the "strand a typist with no explanation" failure this
+//               file goes out of its way to prevent elsewhere. Two notions of
+//               "red" would have been two sources of truth, and the weaker one
+//               was already contained in the stronger: text that has left the
+//               target's bare letters is exactly text no keystroke can bring
+//               back, so it is UNIT_STUCK too. A wrong TONE still leaves the
+//               border neutral, deliberately: that is UNIT_WRONG, the tone key
+//               replaces it in place, and the character itself already prints
+//               neutral instead of green.
+//
+//   THE PAINT   each typed character against the character its own PAIRED target
+//               unit has in the same place, AND the verdict of that unit — green
+//               for right, red for wrong and for surplus, amber for wrong-but-
+//               repairable, neutral for a mark that has not arrived yet. Pairing
+//               first is the whole of the first half: inside a unit the two sides
+//               are the same length by construction, so a character index means
+//               something there and nowhere else.
+//               The unit's verdict is the other half, and it is what makes
+//               "neutral" honest. The same character — right letter, right case,
+//               mark not there — is three different things depending on the unit
+//               around it: still on its way in a UNIT_OK syllable, typed wrong and
+//               one keystroke from home in a UNIT_WRONG one, dead in a UNIT_STUCK
+//               one. Painting all three neutral is what let a red border, a "press
+//               Backspace" notice and a charged error sit over a line of green.
+//               See charVerdict(), and the shortfall in updatePracticeDisplay()
+//               for the broken unit that has NO wrong character to mark — the
+//               syllable closed early, whose mistake is the character it never got.
+//
+//   THE SCORE   see recordKeystroke(): an error is charged on a per-unit RISING
+//               EDGE, and the denominator counts the UNITS the typist attempted.
+//               Both sides count unit-attempts — the one quantity — so the ratio
+//               says something. It did not while the denominator counted
+//               keystrokes.
+const UNIT_OK = 'ok';
+const UNIT_WRONG = 'wrong';   // wrong, but a keystroke can still bring it back
+const UNIT_STUCK = 'stuck';   // wrong, and no keystroke can
+
+// ── The two halves of "was that keystroke right?" ───────────────────────────
+// A half-typed syllable is judged on two separate things, and the rule of thumb
+// this replaces tangled them into one per-character test that was wrong on both.
+//
+//   isCleanPartial()  Nothing WRONG has been typed yet: a mark that has already
+//                     appeared has to be the target's, a mark that has not is
+//                     simply still pending. This half is the pedagogy — the app
+//                     teaches the tone and diacritic keys, so `dduwowngs`
+//                     ("đướng": every bare letter of "đường" in place and the one
+//                     thing being taught wrong) is an error even though the
+//                     engine could still replace that tone in place.
+//
+//   canStillFinish()  ...and the target is still REACHABLE from here, through
+//                     states that are themselves clean. This is the half that
+//                     was missing, and no per-character rule can supply it. The
+//                     horn is the proof: it comes from a "w" the engine routes
+//                     four different ways (immediate aw/ow/uw pair, backward
+//                     scan, HORN_NUCLEUS cluster, NUCLEUS_NORMALIZE rime fix),
+//                     so WHICH vowel a "w" lands on is a property of the whole
+//                     buffer. The old rule ("a missing horn can arrive at any
+//                     time") was wrong in one direction: it accepted "mua"
+//                     toward "mưa", where the next w is eaten by the "aw" pair
+//                     and lands on the a — the typist told they were fine in a
+//                     state the engine can never finish. The obvious narrowing
+//                     ("...only while no plain a/o/u follows") is wrong in the
+//                     other: "tuo" IS on the way to "tương", because "tuongw" is
+//                     a legal spelling.
+//
+// So the second half asks the ENGINE rather than describing it: replay the keys
+// and see whether the target comes out. Whatever spelling orders transform()
+// accepts, this accepts — by construction, not by restatement, which is the only
+// way the two stay in step when the engine changes.
+
+// Is `cur` the target with some of its marks not added yet, and nothing else?
+function isCleanPartial(cur, want) {
+  if (cur.length > want.length) return false;
+  for (let i = 0; i < cur.length; i++) {
+    const c = cur[i], w = want[i];
+    if (stripChar(c) !== stripChar(w)) return false;   // wrong letter, or wrong case
+    if (c === w) continue;
+    const ci = findVowelInfo(c), wi = findVowelInfo(w);
+    if (ci && wi) {
+      // Same bare letter, so these are a diacritic and/or a tone apart. A tone
+      // difference is judged for the syllable as a whole, below.
+      if (ci.base.toLowerCase() === wi.base.toLowerCase()) continue;
+      // A diacritic that is there but not the target's is both wrong and stuck:
+      // "ô" cannot become "ơ" without a backspace.
+      if (VOWEL_BASE_TO_KEYS[ci.base.toLowerCase()].mod !== '') return false;
+      continue;                                        // "o" still waiting to be "ơ"
+    }
+    // The only other pair stripChar() equates is d/đ: "d" may still take the
+    // bar, "đ" can never give it back.
+    if (stripChar(c) !== c) return false;
+  }
+  // The tone belongs to the SYLLABLE, not to a character: the engine re-picks
+  // its host vowel on every keystroke, so "Vie" + j is "Vịe" and becomes "Việ"
+  // the moment the "ê" arrives. Asking WHICH tone rather than where is what
+  // keeps that legal intermediate from scoring as an error.
+  const typed = getCurrentTone(cur), wanted = getCurrentTone(want);
+  const typedIdx = typed ? typed.toneIdx : 0;
+  return typedIdx === 0 || typedIdx === (wanted ? wanted.toneIdx : 0);
+}
+
+// The keys a replay has to try. Complete, and far smaller than the alphabet,
+// which is what keeps it cheap: pressing a key either merges into a diacritic
+// pair (a/e/o/w/d), applies a tone (s/f/r/x/j), applies the w-modifier (w), or
+// appends itself — and an appended character has to be the target's own bare
+// letter in the target's own case, or the state has already left the target.
+const STRUCTURAL_KEYS = ['a', 'e', 'o', 'w', 'd', 's', 'f', 'r', 'x', 'j'];
+
+function replayKeys(want) {
+  const keys = new Set(STRUCTURAL_KEYS);
+  for (const ch of want) keys.add(stripChar(ch));
+  return [...keys];
+}
+
+// One answer per (target syllable, state), filled a whole GRAPH at a time: an
+// exploration is closed under successors, so reverse-reachability over it
+// answers for every state in it, not just the one that was asked about. A
+// session's target syllables are a small fixed set, so this warms once per
+// syllable — off the keystroke path, because loading a word probes the hint
+// before anything is typed.
+const reachCache = new Map();
+
+function reachCacheKey(want, cur) {
+  return want + ' ' + cur;
+}
+
+// Replay forward from `start` through clean states only, then walk the edges
+// backwards from `want` to mark every state that still has a way through.
+function exploreToward(start, want) {
+  const keys = replayKeys(want);
+  const nodes = [start];
+  const index = new Map([[start, 0]]);
+  const preds = [[]];
+  // transform() carries one bit of cross-keystroke state, and the replay must
+  // leave the live value exactly as it found it (same contract as probeKey).
+  // It is pinned to false during the replay so a state is a function of its TEXT
+  // alone — sound here because the only thing the flag changes is whether "ư"+w
+  // escapes to "uw" or to "w", and both of those put a literal "w" in the text,
+  // which no Vietnamese target contains, so the prune drops them either way.
+  const savedShortcut = lastWWasShortcut;
+  for (let n = 0; n < nodes.length; n++) {
+    const from = nodes[n];
+    if (from === want) continue;          // nothing left to type
+    for (const k of keys) {
+      lastWWasShortcut = false;
+      const next = transform(from, k);
+      if (next === from) continue;        // key changed nothing (a swallowed w)
+      if (!isCleanPartial(next, want)) continue;
+      let to = index.get(next);
+      if (to === undefined) {
+        to = nodes.length;
+        nodes.push(next);
+        index.set(next, to);
+        preds.push([]);
+      }
+      preds[to].push(n);
+    }
+  }
+  lastWWasShortcut = savedShortcut;
+
+  const through = new Array(nodes.length).fill(false);
+  const goal = index.get(want);
+  if (goal !== undefined) {
+    through[goal] = true;
+    const stack = [goal];
+    while (stack.length > 0) {
+      const to = stack.pop();
+      for (const from of preds[to]) {
+        if (!through[from]) { through[from] = true; stack.push(from); }
+      }
+    }
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    reachCache.set(reachCacheKey(want, nodes[i]), through[i]);
+  }
+  return through[0];
+}
+
+// Can the engine still turn `cur` into `want` with nothing un-typed first? No
+// Backspace: pressing keys is what is being scored, and it is the same
+// assumption the display makes when it prints a stuck diacritic in red.
+function canStillFinish(cur, want) {
+  if (cur === want) return true;
+  if (!isCleanPartial(cur, want)) return false;
+  const cached = reachCache.get(reachCacheKey(want, cur));
+  if (cached !== undefined) return cached;
+  return exploreToward(cur, want);
+}
+
+// Can ONE more keystroke put a wrong syllable back on track?
+//
+// One is enough, and that is a property of the engine rather than an
+// approximation of it. transform() only ever APPENDS to the text or rewrites a
+// character IN PLACE keeping its bare letter and case: applyDiacriticPair
+// collapses a pair onto the first character, setVowelBaseAt keeps case and tone,
+// and the escape paths put the pair's first character back. So the bare letters
+// only ever grow and text that has left the target's can never come back to it,
+// a printed diacritic can never be taken off, and "đ" can never give the bar
+// back — every one of those is one-way. The single thing the engine rewrites
+// freely is the TONE, which it re-picks a host for on every keystroke, and that
+// is one key away.
+//
+// Asked of the engine rather than described, for the same reason
+// canStillFinish() is: whatever transform() accepts, this accepts. The replay is
+// pinned the same way exploreToward() pins it, and puts the flag back.
+function isRepairable(cur, want) {
+  const savedShortcut = lastWWasShortcut;
+  let ok = false;
+  for (const key of replayKeys(want)) {
+    lastWWasShortcut = false;
+    const next = transform(cur, key);
+    if (next !== cur && canStillFinish(next, want)) { ok = true; break; }
+  }
+  lastWWasShortcut = savedShortcut;
+  return ok;
+}
+
+// The text AS THE LIST OF UNITS IT IS: a run of letters, or one space/punctuation
+// character. One function, used on the typed text and on the target
+// INDEPENDENTLY — which is the whole of the pairing rule below.
+function segmentUnits(text) {
+  const chars = [...text];
+  const out = [];
+  let i = 0;
+  while (i < chars.length) {
+    if (!isSyllableChar(chars[i])) { out.push(chars[i]); i++; continue; }
+    let end = i;
+    while (end < chars.length && isSyllableChar(chars[end])) end++;
+    out.push(chars.slice(i, end).join(''));
+    i = end;
+  }
+  return out;
+}
+
+// A unit is a syllable or a separator, and it is one or the other whole: runs of
+// letters are maximal, so a unit's first character decides for all of it.
+function isSyllableUnit(unit) {
+  return isSyllableChar(unit[0]);
+}
+
+// A syllable still being typed has to be clean and still finishable. A syllable
+// the typist has already LEFT is finished and must equal the target's exactly —
+// no later keystroke can reach back into it ("tieng " can never become "tiếng ").
+// A separator is judged the same way as a closed syllable, and so is a syllable
+// that landed where a separator was due: both are committed the moment they are
+// typed and neither can be rewritten in place.
+//
+// Every branch is case-SENSITIVE, and they have to be: completion has always
+// required `current === target`, so a matcher that folded case scored correct
+// letters, tones and diacritics in the wrong case at 100% forever without ever
+// completing the word — the one combination that could strand a typist with no
+// explanation. These lists are full of proper nouns (Việt, Hà Nội, Nguyễn), so a
+// missing Shift is a mistake worth counting.
+function unitStatus(typed, target, closed, probeRepair) {
+  if (closed || !isSyllableUnit(typed) || !isSyllableUnit(target)) {
+    return typed === target ? UNIT_OK : UNIT_STUCK;
+  }
+  if (canStillFinish(typed, target)) return UNIT_OK;
+  if (!probeRepair) return UNIT_WRONG;
+  return isRepairable(typed, target) ? UNIT_WRONG : UNIT_STUCK;
+}
+
+// ── Pairing: by ORDINAL, never by character index ───────────────────────────
+// One walk of the text, one segmentation, FOUR callers — see the MATCHING block.
+//
+// A STEP is what the walk produces and what every caller reads: a span of typed
+// units paired with a span of target units, plus the one verdict that covers the
+// pair. Almost always the span is one unit against one unit; only a slip that
+// changes how many units there are makes it wider (see resync).
+//
+// The walk RETURNS the pairing rather than only the verdicts because three of the
+// four callers need to know what was paired with what, and a caller that works it
+// out for itself is a second answer to the same question. The paint was exactly
+// that second answer — it compared `currentChars[i]` against `targetChars[i]`,
+// one character index into both sides, which is the very assumption ordinal
+// pairing exists to abolish. After a stray letter at the front of a sentence the
+// scorer said "one unit wrong, 98%" and the paint said "29 of 31 characters are
+// wrong", because every character after the slip had slid one place. Same walk,
+// same pairing, one answer.
+//
+// `probeRepair` is what separates the callers. The next-key hint asks "is this
+// still correct?" once per key on the keyboard per keystroke and only needs
+// UNIT_OK vs not, so it does not pay for the repair probe: with the probe off a
+// wrong OPEN syllable reads UNIT_WRONG without asking whether it is in fact
+// stuck, which is the weaker claim and always true of a wrong syllable. The
+// scorer, the border and the paint ask twice per keystroke and need the
+// difference.
+//
+// Both sides are segmented by segmentUnits() and then zipped BY POSITION IN THE
+// LIST. The version this replaces walked one character index into both the typed
+// text and the target (`want[i]`, `want.slice(i, wantEnd)`), which silently
+// assumed the two stay the same LENGTH — and a slip that changes a syllable's
+// length is the commonest typo there is. One stray letter at the front of
+// "Hà Nội là thủ đô của Việt Nam." slid every later syllable off its own target
+// syllable: each one arrived already UNIT_STUCK, each arrival was its own rising
+// edge, and the single keystroke was charged once per remaining unit — 16 errors
+// and 6% for a stray letter at the front, 2 errors and 95% for the identical
+// letter at the back. That is the same position-dependent bias the per-unit edge
+// was introduced to abolish, one level up. Paired by ordinal, "Hba" is one wrong
+// unit and "Nội" is still compared against "Nội".
+//
+// INVARIANT the scorer depends on: the steps PARTITION the typed units. Every
+// branch below consumes at least one and none is skipped, so summing `typed`
+// across the steps gives segmentUnits(text).length exactly — which is what lets
+// the denominator count units without segmenting the text a second time.
+function unitSteps(text, target, probeRepair) {
+  const cur = segmentUnits(text);
+  const want = segmentUnits(target);
+  const steps = [];
+  let i = 0, j = 0;
+  while (i < cur.length) {
+    // Past the end of the target. Every surplus UNIT is its own step — never one
+    // per surplus keystroke, which is what would charge "ann" for "ăn" twice, and
+    // never one for the whole tail either.
+    //
+    // Not one for the whole tail, because the denominator counts units ATTEMPTED
+    // (see recordKeystroke). A surplus unit is an attempt like any other, so a
+    // surplus unit that cost nothing would be a free attempt — and free attempts
+    // are how a bad run HEALS: type another word past the target and the
+    // percentage climbs. Charging every unit the typist attempts, exactly once,
+    // is the only rule the ratio survives.
+    //
+    // It is also what makes an extra separator cost the same in the LAST syllable
+    // as in any other. One step for the whole tail swallowed the second half of a
+    // syllable broken at the end of the target, so the identical slip was charged
+    // 1 there and 2 everywhere else — see the end of resync() for what that slip
+    // costs now and for the residue that is still not uniform.
+    if (j >= want.length) {
+      steps.push({ typed: [cur[i]], want: [], status: UNIT_STUCK });
+      i++; continue;
+    }
+    // "closed" = something already follows it in the typed text, so the typist is
+    // out of it.
+    const status = unitStatus(cur[i], want[j], i < cur.length - 1, probeRepair);
+    if (status === UNIT_OK) {
+      steps.push({ typed: [cur[i]], want: [want[j]], status });
+      i++; j++; continue;
+    }
+    // Wrong. How MUCH of the two lists the mistake accounts for is the question
+    // the resync answers — see below. One unit each is the answer whenever the
+    // rest still lines up.
+    const slip = resync(cur, i, want, j);
+    steps.push({
+      typed: cur.slice(i, i + slip.typed),
+      want: want.slice(j, j + slip.target),
+      status: slip.typed === 1 && slip.target === 1 ? status : UNIT_STUCK,
+    });
+    i += slip.typed;
+    j += slip.target;
+  }
+  return steps;
+}
+
+// The verdicts alone, for the callers that only ask "is anything wrong?".
+function unitStatuses(text, target, probeRepair) {
+  return unitSteps(text, target, probeRepair).map(s => s.status);
+}
+
+// ── The slips that change how many units there are ──────────────────────────
+// Ordinal pairing answers every slip that leaves the unit COUNT alone. A
+// SEPARATOR slip does not: a missing space runs two target syllables into one
+// typed unit, an extra one breaks one target syllable into two, a wrong one does
+// both — and from there the two lists are permanently one or two apart, which is
+// the index-pairing cascade again, one level up. Measured before this: a missing
+// space at the front of the sentence read 30%, the same missing space at the back
+// read 95%.
+//
+// So a mistake is allowed to account for SEVERAL units on either side, and how
+// many is decided by the only thing that can decide it — whether the rest of the
+// two lists lines up afterwards. One typed unit against one target unit is tried
+// first and kept whenever it works, so nothing below can touch a mistake that
+// sits inside a single syllable; only when that does NOT line up is a wider span
+// looked for, smallest first.
+//
+// This is evidence, not a heuristic: linesUp() asks the SAME question the scorer
+// asks of every other unit, of the units that follow. Nothing is inferred from
+// lengths or positions, which is what would put a bias back. And a span wider
+// than one unit is always UNIT_STUCK — not a convention but the fact, since a
+// separator that was not typed can never appear afterwards (transform() only ever
+// rewrites the syllable it is in, and applyKey() commits the buffer the moment a
+// separator arrives). That is also what stops the search from ever EXCUSING a
+// mistake: the most it can do is charge one unit instead of eight.
+const RESYNC_TYPED_MAX = 6;    // typed units one mistake may account for
+const RESYNC_TARGET_MAX = 6;   // target units one mistake may account for
+const RESYNC_CONFIRM = 2;      // units that have to line up after it
+
+const PLAIN_STEP = { typed: 1, target: 1 };
+
+function resync(cur, i, want, j) {
+  if (linesUp(cur, i + 1, want, j + 1)) return PLAIN_STEP;
+  for (let width = 1; width <= RESYNC_TYPED_MAX + RESYNC_TARGET_MAX; width++) {
+    for (let a = 1; a <= Math.min(width, RESYNC_TYPED_MAX); a++) {
+      const b = width - a;
+      if (b > RESYNC_TARGET_MAX) continue;
+      if (a === 1 && b === 1) continue;                  // already tried, and it did not
+      if (linesUp(cur, i + a, want, j + b)) return { typed: a, target: b };
+    }
+  }
+  // No reading of it explains the rest, which is every state where the slip is
+  // the last thing typed and there is nothing after it to line up with yet.
+  // Charge this unit and walk on: the next keystroke asks again with more to go
+  // on, and the span is found the moment the evidence exists.
+  //
+  // ── THE KNOWN QUIRK, measured rather than asserted ────────────────────────
+  // A separator typed INSIDE a syllable is the one slip this walk does not judge
+  // uniformly, and the exact shape of that is written down here because the
+  // comment it replaces claimed a uniformity the code did not have ("it costs the
+  // same early or late" — checked only on the eight-syllable sentence, where both
+  // ends happen to agree).
+  //
+  // WHAT IT COSTS: 2 errors, being the two units it breaks — the half before the
+  // separator, closed early and therefore wrong, and the half after it, a
+  // syllable the target does not have. Measured over every position of every one
+  // of the 84 targets in both printed spelling orders: 1223 runs, 1205 of them
+  // charged 2.
+  //
+  // THE 18 THAT CHARGE 1: where the fragment AFTER the separator happens to line
+  // up with a target unit by itself, the walk absorbs it instead of judging it —
+  // "nă" + " " + "m" of "năm" is read as "nă" wrong and "m" starting "mới", and
+  // "sang" + " " + "s" of "sáng" as a re-attempt of the whole syllable. Those
+  // readings are not wrong; they are the other true reading of the same text. 12
+  // of the 84 targets have at least one such position, so on those the slip does
+  // cost 1 typed at one end and 2 at the other.
+  //
+  // WHY IT IS NOT FIXED RATHER THAN DOCUMENTED: the ambiguity is in the TEXT, not
+  // in the walk. A composing engine gives each half its own composition, so
+  // "tieeng" split after "tie" is "tie" + "éng" — six letters where the syllable
+  // has five — and nothing downstream can tell that from two syllables that are
+  // each wrong. Two rules that tried were written and measured, and each moved the
+  // dependence rather than removing it: rejoining the halves and asking whether
+  // they still compose toward the target charges 1 where the halves happen to
+  // rejoin and 2 where the composition has already diverged; consuming the rest of
+  // the typed text as one unresolved span goes DEAF, swallowing a second slip in a
+  // later syllable for nothing, which is round 4's defect with a new mechanism.
+  //
+  // BOUNDS: one error, in one slip class, on 12 of 84 targets — at most 33
+  // percentage points on a one-syllable target and 5 on a sentence. Every other
+  // slip class is uniform at 1 charge over 15,776 runs with no exceptions.
+  //
+  // The denominator has no such ambiguity: an extra separator adds two units to
+  // the count of units attempted whichever way the halves are read.
+  return PLAIN_STEP;
+}
+
+// Do the units from here on pair up? At least one of them has to be there AND
+// pair: a span with nothing typed after it is a guess, and a guess is exactly
+// what may not move the alignment — the plain one-for-one step is what every
+// unconfirmed reading falls back to.
+function linesUp(cur, i, want, j) {
+  let confirmed = 0;
+  for (let t = 0; t < RESYNC_CONFIRM; t++) {
+    const ci = i + t, wj = j + t;
+    if (ci >= cur.length) break;              // not typed yet
+    if (wj >= want.length) return false;      // past the end of the target
+    if (unitStatus(cur[ci], want[wj], ci < cur.length - 1, false) !== UNIT_OK) return false;
+    confirmed++;
+  }
+  return confirmed > 0;
+}
+
+function isComposingToward(text, target) {
+  return unitStatuses(text, target, false).every(s => s === UNIT_OK);
+}
+
+// ============================================================================
+// WORD COMPLETION
+// ============================================================================
+
+// The pending auto-advance belongs to the word that was just completed. Anything
+// that replaces that word — skip, level change, mode switch — must cancel it
+// first, or the timer advances a second time on top of whatever the user did
+// (skip lands two words on, a fresh level starts at word 2). Same store-the-
+// handle pattern as pressTimer and toastTimer.
+let advanceTimer = null;
+
+// ONE notion of "the current word has ended", read by both of the things that
+// have to agree about it: completion (do not fire twice) and scoring (this
+// keystroke is not part of that word any more).
+//
+// They used to disagree. The flag guarded onWordComplete only, while the buffer
+// stayed pointing at the finished word until the 500 ms timer fired — so every
+// keystroke typed inside that window was appended to a word that was already
+// complete, scored against it, counted as an error, and then thrown away when
+// the next word loaded. The faster the typist, the more of them. The keystroke
+// belongs to the NEXT word, so that is where it goes: the first one after a
+// completion cuts the wait short and starts the next word itself.
+let wordEnded = false;
+
+function cancelAutoAdvance() {
+  if (advanceTimer) clearTimeout(advanceTimer);
+  advanceTimer = null;
+  wordEnded = false;
+}
+
+function onWordComplete() {
+  if (wordEnded) return;
+  wordEnded = true;
+  els.feedback.textContent = '✓ Chính xác!';
+  els.feedback.className = 'feedback good';
+  if (advanceTimer) clearTimeout(advanceTimer);
+  advanceTimer = null;
+  // Auto-advance only decides whether the word moves on BY ITSELF. Typing on is
+  // the typist saying "next" out loud, and is handled on the keystroke either
+  // way — see the keydown handler.
+  if (state.autoAdvance) {
+    advanceTimer = setTimeout(() => {
+      advanceTimer = null;
+      nextWord();
+    }, 500);
+  }
+}
+
+// The single place a keystroke turns into text. The input handler applies the
+// result to state; the next-key hint runs it on a copy to find out where each
+// candidate key would lead — so "what does this key do" has one answer and the
+// hint cannot advertise behaviour the handler does not have.
+function applyKey(committed, buffer, key) {
+  if (isResetChar(key)) {
+    // Syllable ends here: flush it and append the key literally.
+    return { committed: committed + buffer + key, buffer: '' };
+  }
+  return { committed, buffer: transform(buffer, key) };
+}
+
+// ── THE KEYSTROKE LOG — the text is what the KEYS made ──────────────────────
+// state.keys is the sequence of keystrokes that produced (committed, buffer),
+// and the three functions below are the ONLY writers of all three: type one key,
+// undo one key, clear. Keeping the sequence is what lets Backspace undo a
+// KEYSTROKE, and the text on its own cannot answer that question.
+//
+// It cannot, because a keystroke is not a character. transform() rewrites
+// characters IN PLACE: a tone key re-picks its host vowel on every keystroke and
+// replaces the tone there, "dd" collapses to "đ", "ee" to "ê", "ow" to "ơ". So
+// one keystroke can be spread across a character an earlier keystroke wrote, and
+// popping the last CHARACTER undoes a mixture of both:
+//
+//   "Vieetj" -> "Việt".  The last keystroke, "j", moved the tone onto the "ê".
+//                        Popping a character took the "t" instead — the tone the
+//                        typist wanted to take back stayed, and the letter they
+//                        did not touch went.
+//   "as" -> "á".         Popping a character removes the "a" as well as the "s",
+//                        so one Backspace undoes two keystrokes: the typist loses
+//                        more than they pressed.
+//   "Ha" + space.        Popping the space left "Ha" COMMITTED with an empty
+//                        buffer — the same text, but a state where no tone key
+//                        can reach the "a" any more. The app's own notice says to
+//                        press Backspace to get out of a dead end, and pressing it
+//                        made one: red border, 0%, and not one key hinted.
+//
+// Replaying is the cheapest CORRECT undo, and it is correct by construction:
+// applyKey() is a pure function of (committed, buffer, key) plus transform()'s one
+// bit of cross-keystroke state, and that bit is unobservable while the buffer is
+// empty (it is only read on the pair-escape path, which needs a non-empty
+// buffer) — so a replay that starts from an empty text with the bit cleared
+// reproduces the live states exactly, keystroke for keystroke. The hint's probe
+// path already relies on the same property one key at a time.
+//
+// SWALLOWED KEYS ARE LOGGED. The redundant "w" of "dduwowngf" produces no text,
+// but it is a keystroke and the flag above notices it, so dropping it from the
+// log would make a later replay diverge from what the typist actually typed.
+// Undo therefore pops keys until the TEXT changes: a keystroke that produced
+// nothing has nothing to undo, and Backspace must not appear to do nothing.
+function typeKey(key) {
+  const next = applyKey(state.committed, state.buffer, key);
+  const changed = next.committed !== state.committed || next.buffer !== state.buffer;
+  state.keys.push(key);
+  state.committed = next.committed;
+  state.buffer = next.buffer;
+  return changed;
+}
+
+function composeKeys(keys) {
+  resetTelexState();
+  let committed = '', buffer = '';
+  for (const k of keys) {
+    const next = applyKey(committed, buffer, k);
+    committed = next.committed;
+    buffer = next.buffer;
+  }
+  return { committed, buffer };
+}
+
+// Undo the last keystroke that produced anything, and nothing else.
+function undoKey() {
+  const was = getCurrentText();
+  while (state.keys.length > 0) {
+    state.keys.pop();
+    const composed = composeKeys(state.keys);
+    state.committed = composed.committed;
+    state.buffer = composed.buffer;
+    if (getCurrentText() !== was) return;
+  }
+  // The log ran out. The text is empty by the invariant above, and now provably
+  // is: composeKeys([]) produced it.
+}
+
+// Everything that throws the text away — a new word, Escape, Clear, the mode
+// switch, the IME alarm — goes through here, so the log can never be left
+// describing text that is gone. It is the empty case of the same rule the other
+// two obey: the text is what composeKeys(state.keys) makes of the log.
+//
+// It clears transform()'s cross-keystroke bit as a side effect, which the UI
+// deliberately does NOT do at a plain syllable break (see resetTelexState). Safe
+// for the same reason it is unobservable there: the bit is read only on the
+// pair-escape path, which needs a non-empty buffer, and this leaves the buffer
+// empty.
+function clearTyped() {
+  state.keys = [];
+  const composed = composeKeys(state.keys);
+  state.committed = composed.committed;
+  state.buffer = composed.buffer;
+}
+
+// END OF SYLLABLE — one RULE, not a list of keys (mirrors VietDvorak.ahk).
+//
+//   The syllable survives only a letter keystroke (bare or with Shift). EVERY
+//   other character ends it.
+//
+// The old version enumerated eight punctuation marks. A list like that is always
+// missing an entry, and this one was: "-", "/", "'", "[", every digit. Missing
+// them means the buffer keeps pointing at a syllable the caret has already left,
+// so the next tone key rewrites text that is already committed — "Vieetj-Nams"
+// came out "Viết-Nam": the final "s" jumped back over the "-" onto the "ệ" of
+// the previous syllable, replacing its nặng with a sắc, and "Nam" never got the
+// tone at all. Correct is "Việt-Nám".
+const LETTER_KEY = /^[A-Za-z]$/;
+
+function isResetChar(key) {
+  return !LETTER_KEY.test(key);
+}
+
+// The composed-text counterpart of the rule above: a syllable is a run of
+// letters, and a Vietnamese letter is one whose bare base letter is A-Za-z
+// ("ế" -> "e", "đ" -> "d"). One rule, applied to keystrokes on one side and to
+// finished text on the other.
+function isSyllableChar(ch) {
+  return LETTER_KEY.test(stripChar(ch));
+}
+
+// ONE mistake, charged ONCE PER UNIT IT BREAKS — and a mistake breaks one unit,
+// with a single exception: a separator typed INSIDE a syllable breaks the two
+// halves it makes of it, and is charged twice. That exception, and the residue of
+// it that is still not uniform, is measured and written down at the end of
+// resync(); this comment is about everything else, which is one unit and one
+// charge, in every position, over 15,776 measured single-mutation runs.
+//
+// The scored predicate is a property of the text, so a mark that is wrong stays
+// wrong on every keystroke that follows it until it is repaired. Charging per
+// keystroke therefore charged a single wrong tone once for itself and again for
+// every key typed after it — and how many that was depended on WHERE in the
+// spelling the tone key sits. The app prints both orders side by side
+// ("Gõ chuỗi: X hoặc Y"), so the identical slip cost 2.29x more in the early-tone
+// spelling than in the late-tone one (71 charges vs 31 across the 31 toned
+// single-syllable targets), and a learner who got one tone wrong per syllable of
+// "Hà Nội là thủ đô của Việt Nam." read 5% — "you cannot type" for a mistake that
+// is "one tone per word".
+//
+// So the charge is on the EDGE, not the level: a keystroke costs an error when it
+// TAKES A UNIT from correct to wrong. Keystrokes typed while that unit is ALREADY
+// wrong add nothing until it is repaired — a tone key replaces a tone in place,
+// and Backspace walks back to a clean prefix — and the next wrong keystroke after
+// that is a fresh edge. Every first wrong keystroke is still an error, so no row
+// of the scoring truth table is weakened: a wrong tone, a wrong diacritic, a
+// wrong case, an overrun and a dead end are all rising edges.
+//
+// PER UNIT, not per text, and that is the whole of the difference. A rising edge
+// on the WHOLE text goes deaf for the rest of the target after the first mistake:
+// a syllable the typist has left can never be repaired, so every later keystroke
+// — including a second wrong tone in a LATER syllable — was free until the word
+// was abandoned. Each unit carries its own edge, so a second syllable's slip is
+// its own mistake and is charged like one.
+//
+// "Per unit" only means "once" while the units on the two sides stay PAIRED, and
+// that is what unitSteps() now guarantees and used to not: it walked one
+// character index into both sides, so a slip that changed a syllable's LENGTH slid
+// every later syllable onto the wrong target syllable and charged the one
+// keystroke once per remaining unit. See the pairing comment there — this claim
+// is only as true as that pairing is.
+//
+// ── ONE QUANTITY: the UNIT-ATTEMPT ──────────────────────────────────────────
+// Both sides of the accuracy fraction count UNIT-ATTEMPTS.
+//
+//   an attempt   the typist enters a unit — or brings a unit that had gone wrong
+//                back to correct, which arms it to be broken again
+//   the numerator   attempts that were broken   (state.errorChars)
+//   the denominator every attempt made          (state.unitAttempts)
+//
+//   accuracy = (attempts - attempts broken) / attempts
+//
+// Every attempt is either broken or it is not, so the numerator can never exceed
+// the denominator and the percentage cannot leave [0, 100]. That is the whole of
+// it, and it is one sentence on purpose.
+//
+// WHAT THIS REPLACES, AND WHY THE OLD ONE HAD NO MEANING. The numerator has
+// counted UNITS since the per-unit edge went in; the denominator went on counting
+// KEYSTROKES. Two counters that disagree about what a run is made of do not have
+// a ratio — and the disagreement had to be papered over with a rule ("absorbed":
+// stop counting keystrokes once the landing unit is UNIT_STUCK) which decided the
+// final score of a slip by how much typing happened to be left inside the damaged
+// syllable. On a single-syllable target there is only ONE unit, so a single wrong
+// letter pinned accuracy at offset/(offset+1) for ever, however much correct
+// typing followed: 0% for the first key of "tôi", 75% for the last key of the
+// same word, the same mistake either way. Mistype the first key of all 30 easy
+// words and the readout said 0%; mistype the last key of the same 30 words and it
+// said 75%. Deleting "absorbed" on its own would only have swapped that for round
+// 4's self-healing — a dead unit's numerator is frozen while a keystroke
+// denominator climbs, so a bad run recovers by typing on. Neither is fixable
+// while the two sides count different things; they count the same thing now.
+//
+// A KEYSTROKE IS NOT AN ATTEMPT, and that is what buys position independence.
+// How many keystrokes a syllable takes depends on the spelling order, on which
+// diacritics it carries and on where in the word the typist slipped; how many
+// UNITS a run has is a property of the text alone. So the same slip typed early
+// and typed late produce the same denominator because they produce the same
+// units, not because anything was corrected for.
+//
+// WPM keeps its own counter (state.totalChars) and counts CHARACTERS, because
+// that is what a rate of typing is. Two questions, two counters — the conflation
+// of them is what this fixes, and it is why "absorbed" is gone rather than moved:
+// its whole justification was that the denominator was counting keystrokes, and
+// nothing counts keystrokes for accuracy any more. A keystroke into a dead
+// syllable is a character typed (WPM counts it) and no attempt at anything
+// (accuracy does not see it).
+//
+// check-parity.mjs's `keystrokes-into-a-dead-end` row was written against the
+// deleted rule and expected typed: 3 for 'muan'. It has been corrected: 'muan'
+// is four characters and always was, so the row now expects typed: 4 and pins
+// the accuracy pair directly — attempts: 1, errors: 1, accuracy: 0 — because
+// `typed` is the character count WPM divides and is NOT the accuracy
+// denominator. Reverting this denominator to counting keystrokes now fails that
+// row by name, reporting attempts 4 and accuracy 75 — the self-healing symptom
+// itself, caught.
+//
+// Both vectors are DERIVED from the same walk applied to the text before and
+// after the keystroke, so there is no latch to go stale across a word change, a
+// Backspace, an Escape or a mode switch — an empty text has no units and no unit
+// is wrong, so loading a word re-arms every charge by itself.
+function recordKeystroke(before, after) {
+  // Every number in the stats bar is a measurement over ONE window, and the
+  // window opens on the first keystroke. So the counters are opened WITH it,
+  // here, rather than each being cleared by whoever happens to remember: there is
+  // then no way to read a rate off a fresh clock and a stale character count, or
+  // a percentage off one run's mistakes and another run's attempts.
+  // `startTime === null` is the window being shut, and it is the only thing that
+  // has to be said to shut it.
+  if (state.startTime === null) {
+    state.startTime = Date.now();
+    state.totalChars = 0;
+    state.unitAttempts = 0;
+    state.errorChars = 0;
+  }
+  // A unit the typist had not reached yet counts as correct: arriving IN it
+  // wrong is the same rising edge as breaking one that was already there.
+  let broke = false;
+  for (let u = 0; u < after.length; u++) {
+    const was = u < before.length ? before[u].status : UNIT_OK;
+    if (was === UNIT_OK && after[u].status !== UNIT_OK) { broke = true; break; }
+  }
+  // Units ENTERED by this keystroke. Counted off the steps rather than by
+  // segmenting the text again: the steps partition the typed units (see
+  // unitSteps), so this IS the unit count of the text, read from the same walk
+  // the charge above is read from. It is what makes the two sides one quantity.
+  //
+  // The unit COUNT, never the step count — the step list shrinks and grows again
+  // as resync loses and regains the alignment, and a denominator that moved with
+  // it would charge a typist for the walk changing its mind. A keystroke only
+  // ever adds one character, so the unit count only ever grows, by 0 or by 1.
+  const entered = unitsIn(after) - unitsIn(before);
+  // A unit brought BACK to correct owes a second attempt: the charge re-arms on
+  // it (a tone key replaces a tone in place), so without this a second wrong tone
+  // in the same syllable would be charged against an attempt the first one had
+  // already spent — and accuracy would go negative.
+  //
+  // IN PLACE, which is the only way a repair can happen: transform() rewrites the
+  // syllable the caret is in, so a repair adds no unit and shows up in the LAST
+  // step. Asking the whole step list instead — "did anything go from wrong to
+  // right?" — also answers yes when resync merely re-pairs the units after a
+  // length-changing slip, and that is not a second attempt at anything. It cost
+  // the extra-separator slip a spurious attempt in exactly the positions where
+  // the re-pairing happened to land, i.e. it put a position dependence back into
+  // the denominator after the numerator had lost it.
+  const repaired = entered === 0 && before.length > 0 && after.length > 0
+    && before[before.length - 1].status !== UNIT_OK
+    && after[after.length - 1].status === UNIT_OK;
+  state.totalChars++;                       // characters produced — WPM's counter
+  state.unitAttempts += entered + (repaired ? 1 : 0);
+  if (broke) state.errorChars++;
+  updateStats();
+}
+
+function unitsIn(steps) {
+  let n = 0;
+  for (const s of steps) n += s.typed.length;
+  return n;
+}
+
+// A rate needs a window, and the window only opens on the FIRST keystroke: that
+// keystroke marks t=0, it does not happen inside the measured time. Counting its
+// character while excluding its duration is what made every run read slightly
+// fast; dividing 2 characters by 30 ms is what made the first few keystrokes
+// read 800 WPM. So: measure totalChars-1 over the elapsed window, and show
+// nothing at all until there is enough of both to mean something.
+//
+// totalChars counts CHARACTERS and the accuracy line below does not touch it.
+// Every keystroke that changed the text produced a character, including the ones
+// typed into a syllable that can no longer be saved: they are worth no ACCURACY,
+// because the unit they landed in has already been charged and the denominator
+// they belong to counts units rather than keystrokes — but they were typed, and
+// a speed that skipped them was measuring something nobody asked for. Two
+// questions, two counters; see recordKeystroke for why conflating them left the
+// accuracy fraction with no meaning at all.
+const WPM_MIN_CHARS = 5;         // one "word" at the standard 5 chars per word
+const WPM_MIN_ELAPSED_MS = 2000;
+const WPM_PLACEHOLDER = '—';
+
+function updateStats() {
+  const measuredChars = Math.max(0, state.totalChars - 1);
+  const elapsedMs = state.startTime === null ? 0 : Date.now() - state.startTime;
+  const enough = measuredChars >= WPM_MIN_CHARS && elapsedMs >= WPM_MIN_ELAPSED_MS;
+  els.wpm.textContent = enough
+    ? Math.round((measuredChars / 5) / (elapsedMs / 60000))
+    : WPM_PLACEHOLDER;
+  els.acc.textContent = state.unitAttempts > 0
+    ? Math.round(((state.unitAttempts - state.errorChars) / state.unitAttempts) * 100)
+    : 100;
+}
+
+// ============================================================================
+// INPUT HANDLING
+// ============================================================================
+
+// An external Vietnamese input method (VietDvorak in VN mode, Unikey, EVKey, the
+// Windows Vietnamese layout) composes the text BEFORE the browser sees it: it
+// swallows the tone key and sends {Backspace} plus the finished character. The
+// page then runs its own Telex on already-composed text — mangled output, and an
+// error counted for a keystroke the user got right.
+//
+// The tell is unambiguous and needs no timing heuristic: a keydown on a bare
+// Dvorak/US layout can never carry a composed Vietnamese character as e.key. One
+// arriving means something upstream is composing, so there is nothing to guess
+// at and nothing that normal typing can trip.
+//
+// "Composed" = a letter of Vietnamese that is NOT a letter of ASCII. The second
+// half matters: ALL_VOWEL_CHARS contains the plain vowels as well ("a" is row
+// zero of the "a" tone table), so without it every "a" would raise the alarm.
+function isComposedVietnamese(key) {
+  return isSyllableChar(key) && !LETTER_KEY.test(key);
+}
+
+function flagExternalIme() {
+  els.imeWarning.hidden = false;
+  // Whatever is in the buffer went through two input methods; it is not what the
+  // user typed, so it is thrown away rather than scored or displayed.
+  clearTyped();
+  updateDisplay();
+  updateNextKeyHint();
+}
+
+els.display.addEventListener('keydown', (e) => {
+  // Allow shortcuts
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+  const key = e.key;
+
+  // One Backspace undoes one KEYSTROKE — see the keystroke-log block for why
+  // that is not the same thing as one character, and for the dead end that
+  // popping a character used to create out of the very state the notice tells
+  // the typist to press Backspace in.
+  if (key === 'Backspace') {
+    e.preventDefault();
+    undoKey();
+    updateDisplay();
+    updateNextKeyHint();
+    return;
+  }
+
+  // Keys that produce no text and must not leave the typing area.
+  //
+  // TAB was the one key that reached this handler and was neither handled nor
+  // prevented, so the browser did what it does with tabindex="0": moved focus off
+  // the display. Focus is only given back on a click, so a typist who pressed it
+  // sat there pressing keys that did nothing at all — the silent strand this file
+  // goes out of its way to prevent everywhere else. It costs a keyboard-only user
+  // the controls, and that is the same trade the focus-owner rule below already
+  // makes and for the same reason: an app that cannot receive keystrokes is broken
+  // in a way that losing tab position is not.
+  //
+  // ENTER produces no text either, but it is not inert: on the sentence level it
+  // is the most natural "next, please" there is, and it was the ONE gesture that
+  // did nothing — Space, "." and every letter took the wordEnded path below, and
+  // could not, because this branch returned before reaching it. It takes the same
+  // path now, and is swallowed afterwards for the same reason Space is: a
+  // keystroke that consumed the latch is a gesture, not the first character of
+  // the next word.
+  if (key === 'Enter' || key === 'Tab') {
+    e.preventDefault();
+    if (key === 'Enter' && state.mode === 'practice' && wordEnded) nextWord();
+    return;
+  }
+
+  if (key === 'Escape') {
+    e.preventDefault();
+    clearTyped();
+    updateDisplay();
+    updateNextKeyHint();   // the highlighted key changed when the text vanished
+    return;
+  }
+
+  // Single-character keys (letters, digits, punctuation including [)
+  if (key.length === 1) {
+    e.preventDefault();
+
+    if (isComposedVietnamese(key)) {
+      flagExternalIme();
+      return;
+    }
+
+    flashKey(key);
+
+    // The current word is already finished, so this keystroke starts the next
+    // one — do not let it land in the finished word's buffer and be scored
+    // against a target the typist has left. This cuts the auto-advance wait
+    // short; with auto-advance off there is no wait, and typing on is still the
+    // one unambiguous "next, please".
+    if (state.mode === 'practice' && wordEnded) {
+      nextWord();
+      // Space is the most natural "next word" gesture there is, and on this
+      // keystroke that is all it is: a GESTURE, not text. Letting it through to
+      // the fresh empty buffer would take the isResetChar path in applyKey() and
+      // commit it literally as a leading space — and since every target starts
+      // with a letter, a leading non-letter is always wrong: one false error
+      // plus a new word that has to be backspaced before it can be typed.
+      // Swallowed here, BEFORE the scoring pair below, so the new word is scored
+      // from the empty text it actually has. The rule is the gesture's own —
+      // "the keystroke that consumed the wordEnded latch, if it is not a letter"
+      // — which is why it lives here rather than in applyKey(): applyKey is the
+      // one shared answer to "what does this key do", used by the next-key hint
+      // and by the self-test replay, and it must not grow a mode-dependent
+      // special case for a question about the UI's state.
+      if (isResetChar(key)) return;
+    }
+
+    // Read AFTER the possible nextWord() above: the target this keystroke is
+    // scored against, and the state it starts from, are the ones it lands in.
+    const practice = state.mode === 'practice';
+    const target = practice ? (state.words[state.wordIdx] || '') : '';
+    // Scored with the STRICT predicate — the same one the next-key hint uses.
+    // See the MATCHING block: a wrong tone or a wrong diacritic is an error here
+    // even though the base letters still line up. Asked twice, before and after,
+    // because what is charged is the EDGE between the two — see recordKeystroke.
+    // The STEPS rather than the verdicts alone: the denominator counts the units
+    // the typist entered, and the pairing is where that count lives.
+    const before = practice ? unitSteps(getCurrentText(), target, true) : null;
+
+    // A key the engine swallows — the redundant "w" of "dduwowngf", which asks
+    // for a horn that is already there — leaves the text byte-identical. Nothing
+    // was typed, so there is nothing to score: counting it would put a character
+    // in the accuracy denominator and in the WPM that the typist never produced.
+    // It IS logged as a keystroke (see typeKey), because a replay of the log has
+    // to be the run the typist made.
+    const changed = typeKey(key);
+
+    if (practice && changed) {
+      recordKeystroke(before, unitSteps(getCurrentText(), target, true));
+    }
+    updateDisplay();
+    updateNextKeyHint();
+  }
+});
+
+// ============================================================================
+// CONTROLS
+// ============================================================================
+
+// --- Focus: one owner -------------------------------------------------------
+// The page only receives keystrokes while #input-display has focus, so every
+// control that takes focus has to give it back. That obligation used to live in
+// the individual handlers, where two of six remembered it and four did not:
+// clicking "Reset stats" or any checkbox moved focus onto the control and killed
+// typing silently — no key flash, no error, no clue. The obligation is not
+// per-handler, so it does not live in the handlers any more.
+//
+// One exception, and it is about timing rather than ownership: refocusing while
+// a <select> dropdown is opening would close it before a choice can be made, so
+// the select is returned on `change` instead — once the choice is final.
+//
+// Cost: a keyboard user tabbing through the toggle row is bounced back to the
+// display after each toggle. Accepted — an app that cannot receive keystrokes is
+// broken in a way that losing tab position is not.
+function restoreTypingFocus() {
+  if (document.activeElement !== els.display) els.display.focus();
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#input-display')) { restoreTypingFocus(); return; }
+  const control = e.target.closest('button, input, select, label');
+  if (!control || control.tagName === 'SELECT') return;
+  restoreTypingFocus();
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.tagName === 'SELECT') restoreTypingFocus();
+});
+
+// --- Practice controls ------------------------------------------------------
+
+els.skip.addEventListener('click', () => {
+  nextWord('↷ Bỏ qua');
+});
+
+els.reset.addEventListener('click', () => {
+  // Shutting the window is the whole of the reset — recordKeystroke opens a fresh
+  // one, and opening it is what zeroes the counters (see there). They are zeroed
+  // here too so the bar shows the reset immediately rather than at the next
+  // keystroke; if these two ever disagree, the window is the one that is right.
+  state.startTime = null;
+  state.totalChars = 0;
+  state.unitAttempts = 0;
+  state.errorChars = 0;
+  updateStats();          // one place decides what an empty stat looks like
+  els.feedback.textContent = 'Stats reset.';
+  els.feedback.className = 'feedback';
+});
+
+els.level.addEventListener('change', (e) => {
+  loadLevel(e.target.value);
+});
+
+// --- Settings: DOM controls -> state ----------------------------------------
+// The checkboxes and the level <select> are the source of truth for these
+// settings. The browser restores their values across a reload and the user reads
+// them off the screen, so state is DERIVED from them — at init and on every
+// change, one direction. Initialising state from a literal instead left a
+// restored-but-unchecked box with no event to correct it: the panel stayed
+// visible while state said it was hidden.
+function syncSettingsFromControls() {
+  state.showHint = els.showHint.checked;
+  state.autoAdvance = els.autoAdvance.checked;
+  state.showKb = els.showKb.checked;
+  state.showNext = els.showNext.checked;
+
+  els.targetHint.style.display = state.showHint ? '' : 'none';
+  els.kbSection.style.display = state.showKb ? '' : 'none';
+  updateNextKeyHint();
+}
+
+els.toggleRow.addEventListener('change', syncSettingsFromControls);
+
+// Mode toggle
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => setMode(btn.dataset.mode));
+});
+
+// Free-mode actions
+els.btnCopy.addEventListener('click', copyContent);
+els.btnClear.addEventListener('click', clearContent);
+
+// The warning is dismissed by the user, not by us guessing that the external IME
+// went away: reload the word so practice restarts from a clean buffer.
+els.imeDismiss.addEventListener('click', () => {
+  els.imeWarning.hidden = true;
+  if (state.mode === 'practice') loadCurrentWord();
+  else { clearTyped(); updateDisplay(); }
+});
+
+// ============================================================================
+// SELF-TEST (algorithm sanity check; logs to console)
+// ============================================================================
+// The vector list below is GENERATED from telex-conformance.txt — the single
+// source of truth for Telex behaviour, shared with VietDvorak.ahk. practice.html
+// has to stay one offline file and cannot fetch the .txt over file://, so the
+// copy is unavoidable; what matters is that it is DERIVED, never hand-authored.
+//
+// Regenerate it with:      node check-parity.mjs --sync-selftests
+// Plain `node check-parity.mjs` fails if this block has drifted from the .txt,
+// so the copy cannot go stale silently.
+
+// BEGIN GENERATED FROM telex-conformance.txt — do not edit by hand
+// Section "transform" of the spec only — runSelfTests() replays these through
+// bare transform(). The spec's "integration" section drives the apply path and
+// is checked by check-parity.mjs, which runs both sections through both engines.
+const TELEX_VECTORS = [
+  // Header examples from VietDvorak.ahk (must never regress)
+  ['tieengs',   'tiếng'],
+  ['ngoaif',    'ngoài'],
+  ['soajn',     'soạn'],
+  ['Quynhf',    'Quỳnh'],
+  ['ass',       'as'],
+  ['aaa',       'aa'],
+  ['oww',       'ow'],
+  ['ww',        'w'],
+  ['chww',      'chw'],
+  ['luujw',     'lựu'],
+  ['luuwj',     'lựu'],
+  ['dduojcw',   'được'],
+  ['giw',       'giư'],
+
+  // Horn on the nucleus as a unit: uu / uou (C1)
+  ['luuw',      'lưu'],
+  ['luwu',      'lưu'],
+  ['huwu',      'hưu'],
+  ['cuuws',     'cứu'],
+  ['luuwj',     'lựu'],
+  ['luujw',     'lựu'],
+  ['huouw',     'hươu'],
+  ['huowu',     'hươu'],
+  ['huwou',     'hươu'],
+  ['ruouwj',    'rượu'],
+  ['ruowuj',    'rượu'],
+  ['ruoujw',    'rượu'],
+  ['ruwouj',    'rượu'],
+  ['buouws',    'bướu'],
+
+  // Horn normalisation ưo / uơ -> ươ (C2); tone follows the nucleus
+  ['dduwongf',  'đường'],
+  ['dduowngf',  'đường'],
+  ['dduwowngf', 'đường'],
+  ['dduongwf',  'đường'],
+  ['dduwocj',   'được'],
+  ['dduocwj',   'được'],
+  ['dduojcw',   'được'],
+  ['dduwojc',   'được'],
+  ['nguwoif',   'người'],
+  ['nguowif',   'người'],
+  ['nguwofi',   'người'],
+  ['nguwowif',  'người'],
+  ['truwongf',  'trường'],
+  ['truowngf',  'trường'],
+  ['nuwocs',    'nước'],
+  ['nuowcs',    'nước'],
+  ['tuwongr',   'tưởng'],
+  ['tuwowngr',  'tưởng'],
+  ['tuongwr',   'tưởng'],
+  ['thuowng',   'thương'],
+  ['thuowngf',  'thường'],
+  ['giowis',    'giới'],
+  ['mowis',     'mới'],
+
+  // ...and the same rime at the END of the buffer: fixed EAGERLY, on sight
+  // The two NUCLEUS_NORMALIZE entries differ in one bit — `lazy` — and that
+  // bit is observable ONLY here, while the rime is still the whole tail of
+  // the buffer. Every vector above types something after the rime, and by
+  // then eager and lazy have converged on the same "ươ": they pin WHAT the
+  // fix is and say nothing about WHEN it happens. These say when. "ưo" is
+  // not a legal rime at any length, so there is no spelling to protect and
+  // nothing to wait for — waiting would only park "đưo", a string that
+  // cannot exist, on the screen. Contrast the "uơ" group below.
+  ['uwo',       'ươ'],
+  ['dduwo',     'đươ'],
+  ['nguwo',     'ngươ'],
+  ['tuwo',      'tươ'],
+  ['Dduwo',     'Đươ'],
+  ['NGUWO',     'NGƯƠ'],
+  ['dduwoj',    'đượ'],
+  ['nguwof',    'ngườ'],
+  ['nuwos',     'nướ'],
+  ['tuwor',     'tưở'],
+
+  // A redundant "w" on an already-horned rime is SWALLOWED, never escaped
+  // Once the rime is "ươ" the request for a horn is already satisfied, so a
+  // further "w" has nothing left to undo: a pair-escape may only undo a horn
+  // the USER typed, never one the engine inserted. Scoped to the target form
+  // of NUCLEUS_NORMALIZE, so the DIACRITIC_PAIRS escapes ("oww" -> "ow",
+  // "uww" -> "uw", "ww" -> "w", "chww" -> "chw") are untouched. Swallowing is
+  // idempotent: further w's keep finding the same finished rime.
+  ['uwoww',     'ươ'],
+  ['dduwoww',   'đươ'],
+  ['nguwoww',   'ngươ'],
+  ['dduwowww',  'đươ'],
+  ['dduwojw',   'đượ'],
+
+  // uơ is a legal OPEN rime and must stay (thuở stem)
+  ['thuow',     'thuơ'],
+  ['thuowr',    'thuở'],
+  ['huow',      'huơ'],
+  ['quowr',     'quở'],
+  ['uow',       'uơ'],
+  ['quow',      'quơ'],
+
+  // aw -> ă: the third w-pair, productively (ow/uw are covered above)
+  ['nawm',      'năm'],
+  ['awn',       'ăn'],
+  ['nawms',     'nắm'],
+  ['nawngs',    'nắng'],
+  ['hawngf',    'hằng'],
+  ['phawngr',   'phẳng'],
+  ['chawxn',    'chẵn'],
+  ['lawngj',    'lặng'],
+  ['nangws',    'nắng'],
+
+  // Late "w" landing on an EARLIER vowel (the backward scan)
+  // The horn goes to the last MODIFIABLE vowel, not to the last character,
+  // so it reaches back over the consonants that follow it. One vector per
+  // W_MODIFIER cell picked by this scan: a -> ă, u -> ư (o -> ơ is "dduojcw"
+  // and "tuongwr" above).
+  ['nangw',     'năng'],
+  ['cungw',     'cưng'],
+  ['ddungwf',   'đừng'],
+
+  // Tone placement: glide pairs oa / oe / uy (C3, TONE_PLACEMENT_MODERN=true)
+  ['hoaf',      'hoà'],
+  ['hoaj',      'hoạ'],
+  ['khoer',     'khoẻ'],
+  ['thuyr',     'thuỷ'],
+  ['huyr',      'huỷ'],
+  ['tuyf',      'tuỳ'],
+  ['Hoaf',      'Hoà'],
+
+  // Tone placement: everything else is unchanged by that convention
+  ['soajn',     'soạn'],
+  ['toanf',     'toàn'],
+  ['hoaij',     'hoại'],
+  ['xoays',     'xoáy'],
+  ['ngoaif',    'ngoài'],
+  ['cuar',      'của'],
+  ['muaf',      'mùa'],
+  ['kiaf',      'kìa'],
+  ['chaof',     'chào'],
+  ['ngayf',     'ngày'],
+  ['camr',      'cảm'],
+  ['banj',      'bạn'],
+  ['hocj',      'học'],
+
+  // gi / qu initial clusters (the cluster vowel is not a tone target)
+  ['gias',      'giá'],
+  ['gif',       'gì'],
+  ['giowf',     'giờ'],
+  ['giuwx',     'giữ'],
+  ['giuwax',    'giữa'],
+  ['giw',       'giư'],
+  ['quaf',      'quà'],
+  ['quar',      'quả'],
+  ['quys',      'quý'],
+  ['quoocs',    'quốc'],
+  ['quyeets',   'quyết'],
+  ['Quynhf',    'Quỳnh'],
+
+  // Unikey w shortcut (empty or consonant-only buffer) and its ww escape
+  ['w',         'ư'],
+  ['ww',        'w'],
+  ['tw',        'tư'],
+  ['chw',       'chư'],
+  ['chww',      'chw'],
+  ['nghw',      'nghư'],
+  ['chwx',      'chữ'],
+  ['mwa',       'mưa'],
+  ['dwa',       'dưa'],
+  ['W',         'Ư'],
+  ['WW',        'W'],
+  ['CHW',       'CHƯ'],
+
+  // "w" after a vowel that HAS no horned form: nothing for the backward scan
+  // to land on, and no pair to escape, so the "w" is appended literally
+  ['caaw',      'câw'],
+
+  // Each DIACRITIC_PAIRS cell alone, as the whole buffer: the shortest
+  // possible statement of what every pair produces
+  ['aa',        'â'],
+  ['ee',        'ê'],
+  ['oo',        'ô'],
+  ['dd',        'đ'],
+  ['aw',        'ă'],
+  ['ow',        'ơ'],
+  ['uw',        'ư'],
+
+  // Diacritic-pair escape: press the trigger key a third time
+  ['aaa',       'aa'],
+  ['eee',       'ee'],
+  ['ooo',       'oo'],
+  ['ddd',       'dd'],
+  ['aww',       'aw'],
+  ['oww',       'ow'],
+  ['uww',       'uw'],
+
+  // The same escape in uppercase: the restored first letter keeps the case
+  // of the pair that was typed ("AAA" -> "AA", not "aA"). PAIR_ESCAPE's
+  // uppercase half is derived by toUpperCase / StrUpper — once per engine,
+  // by hand, which is exactly the kind of expression that drifts alone.
+  ['AAA',       'AA'],
+  ['EEE',       'EE'],
+  ['OOO',       'OO'],
+  ['DDD',       'DD'],
+  ['AWW',       'AW'],
+  ['OWW',       'OW'],
+  ['UWW',       'UW'],
+
+  // Tone removal: press the same tone key twice
+  ['ass',       'as'],
+  ['aff',       'af'],
+  ['arr',       'ar'],
+  ['axx',       'ax'],
+  ['oss',       'os'],
+  ['eess',      'ês'],
+  ['vieejtj',   'viêtj'],
+  ['hocjj',     'hocj'],
+
+  // Uppercase and mixed case (UPPER_VOWELS is DERIVED from VOWELS by
+  // StrUpper/toUpperCase, so one cell per vowel row pins that derivation)
+  ['TIEENGS',   'TIẾNG'],
+  ['Vieejt',    'Việt'],
+  ['Ddaij',     'Đại'],
+  ['DDAIJ',     'ĐẠI'],
+  ['NGUWOIF',   'NGƯỜI'],
+  ['QUYNHF',    'QUỲNH'],
+  ['LUUWJ',     'LỰU'],
+  ['HUOUW',     'HƯƠU'],
+  ['Nam',       'Nam'],
+  ['DDuwongf',  'Đường'],
+  ['NAWM',      'NĂM'],
+  ['NAWNGS',    'NẮNG'],
+  ['DDAAY',     'ĐÂY'],
+  ['DDEPJ',     'ĐẸP'],
+  ['HOCJ',      'HỌC'],
+  ['KHOONG',    'KHÔNG'],
+  ['TRUOWNGF',  'TRƯỜNG'],
+  ['NGUWOWIF',  'NGƯỜI'],
+
+  // A pair takes its case from its FIRST key, not its second: every vector
+  // above types both keys in the same case, so nothing yet says which one
+  // decides.
+  ['Aa',        'Â'],
+  ['aA',        'â'],
+
+  // Common words, canonical order (modifier then tone)
+  ['vieetj',    'việt'],
+  ['nooij',     'nội'],
+  ['ddaij',     'đại'],
+  ['sinh',      'sinh'],
+  ['nhaf',      'nhà'],
+  ['toots',     'tốt'],
+  ['ddepj',     'đẹp'],
+  ['khoong',    'không'],
+  ['cos',       'có'],
+  ['ddaay',     'đây'],
+  ['laf',       'là'],
+  ['cuoocj',    'cuộc'],
+  ['soongs',    'sống'],
+  ['muoons',    'muốn'],
+  ['thees',     'thế'],
+  ['lamf',      'làm'],
+  ['vieecj',    'việc'],
+  ['hoom',      'hôm'],
+  ['tooi',      'tôi'],
+  ['chungs',    'chúng'],
+  ['nhieeuf',   'nhiều'],
+  ['ddieeuf',   'điều'],
+  ['hieeur',    'hiểu'],
+  ['yeeu',      'yêu'],
+  ['tuwf',      'từ'],
+  ['ddieenr',   'điển'],
+  ['bieets',    'biết'],
+  ['ddoongf',   'đồng'],
+  ['ys',        'ý'],
+  ['nghix',     'nghĩ'],
+  ['chuwx',     'chữ'],
+  ['ddaats',    'đất'],
+  ['xin',       'xin'],
+  ['own',       'ơn'],
+  ['nam',       'nam'],
+
+  // Same words, late-tone order (tone key typed mid-syllable, then the rest)
+  ['tieesng',   'tiếng'],
+  ['vieejt',    'việt'],
+  ['cuoojc',    'cuộc'],
+  ['muoosn',    'muốn'],
+  ['ddoofng',   'đồng'],
+  ['nooji',     'nội'],
+  ['nhieefu',   'nhiều'],
+  ['hieeru',    'hiểu'],
+  ['bieest',    'biết'],
+  ['ddieern',   'điển'],
+  ['lafm',      'làm'],
+  ['tofan',     'toàn'],
+  ['ngofai',    'ngoài'],
+  ['hojc',      'học'],
+  ['bajn',      'bạn'],
+  ['ddaji',     'đại'],
+  ['chafo',     'chào'],
+  ['ngafy',     'ngày'],
+  ['nuwosc',    'nước'],
+
+  // VOWELS cells the word vectors above never reach. Each of the 72 lowercase
+  // cells is a hand-typed Unicode literal duplicated in BOTH engines; a typo in
+  // one is invisible unless some vector produces that exact character. These
+  // close the remaining gaps so the whole table is pinned, one word per cell.
+  ['ddax',      'đã'],
+  ['caanf',     'cần'],
+  ['aanr',      'ẩn'],
+  ['maaux',     'mẫu'],
+  ['baanj',     'bận'],
+  ['bes',       'bé'],
+  ['hef',       'hè'],
+  ['lex',       'lẽ'],
+  ['nhieexm',   'nhiễm'],
+  ['chis',      'chí'],
+  ['chir',      'chỉ'],
+  ['bij',       'bị'],
+  ['bof',       'bò'],
+  ['nhor',      'nhỏ'],
+  ['voxng',     'võng'],
+  ['toor',      'tổ'],
+  ['looix',     'lỗi'],
+  ['mowx',      'mỡ'],
+  ['cux',       'cũ'],
+  ['vuj',       'vụ'],
+  ['thuwr',     'thử'],
+  ['myx',       'mỹ'],
+  ['quyj',      'quỵ'],
+];
+// END GENERATED FROM telex-conformance.txt
+
+// Replay a key sequence through the REAL apply path. Not transform() alone:
+// targets contain spaces and punctuation, and applyKey() is what ends the
+// syllable there — replaying through transform() would test a different program
+// from the one the typist drives.
+function replaySpelling(keys) {
+  resetTelexState();
+  let committed = '', buffer = '';
+  for (const key of keys) {
+    const next = applyKey(committed, buffer, key);
+    committed = next.committed;
+    buffer = next.buffer;
+  }
+  return committed + buffer;
+}
+
+// Every WORD_LISTS entry has to be TYPEABLE: replaying the keys the hint prints
+// must give the entry back, exactly. Nothing executable used to check this — the
+// vectors pin the ENGINE, not the word lists — so the only guard was the prose
+// note above WORD_LISTS about TONE_PLACEMENT_MODERN ("khoẻ", not "khỏe"), and a
+// target spelled the traditional way would simply have been impossible to
+// complete with nothing saying why.
+//
+// BOTH hinted orders are checked, because targetKeyHint() prints both and a
+// target reachable by only one of them makes the other hint a lie.
+//
+// Asserted PER LEVEL, not per corpus. `checked` counts spellings that were
+// actually replayed, so an emptied level contributes nothing at all while the
+// other three keep the count above zero — the anti-vacuity assertion downstream
+// ("checked 0 spellings" is the one result this guard must never report as
+// success") only fires when EVERY level is empty. A level is what the typist
+// picks and what loadLevel() loads, so it is the level that has to be non-empty.
+//
+// The first-character assertion is cheap and pins an assumption that the space
+// swallow in the keydown handler rests on — "every target starts with a letter",
+// stated there in prose with nothing executable behind it. A target that began
+// with a space or a digit would make the wordEnded gesture commit a leading
+// separator: one false error and a word that has to be backspaced before it can
+// be typed.
+function checkWordListsTypeable() {
+  const failures = [];
+  let checked = 0;
+  for (const [level, words] of Object.entries(WORD_LISTS)) {
+    if (words.length === 0) {
+      failures.push(`✗ ${level}: cấp độ rỗng — không có từ nào để luyện`);
+      continue;
+    }
+    for (const word of words) {
+      if (!isSyllableChar([...word][0])) {
+        failures.push(`✗ ${level} "${word}": không bắt đầu bằng chữ cái`);
+      }
+      for (const [order, spell] of [['sớm', wordToTelex], ['muộn', wordToTelexLateTone]]) {
+        const keys = spell(word);
+        const got = replaySpelling(keys);
+        checked++;
+        if (got !== word) failures.push(`✗ ${level} "${word}" (dấu ${order}): '${keys}' -> '${got}'`);
+      }
+    }
+  }
+  return { checked, failures };
+}
+
+function runSelfTests() {
+  let pass = 0;
+  const failures = [];
+  for (const [input, expected] of TELEX_VECTORS) {
+    resetTelexState();
+    let buf = '';
+    for (const ch of input) buf = transform(buf, ch);
+    if (buf === expected) pass++;
+    else failures.push(`✗ '${input}' -> '${buf}' (expected '${expected}')`);
+  }
+  const total = TELEX_VECTORS.length;
+  if (failures.length === 0) {
+    console.log(`Telex self-test: ${pass}/${total} passed (telex-conformance.txt)`);
+  } else {
+    console.error(`Telex self-test: ${pass}/${total} passed — ${failures.length} FAILED`);
+    for (const f of failures) console.error(f);
+  }
+
+  const words = checkWordListsTypeable();
+  if (words.failures.length === 0) {
+    console.log(`Word-list typeability: ${words.checked}/${words.checked} spellings replay to their target`);
+    return;
+  }
+  console.error(
+    `Word-list typeability: ${words.checked - words.failures.length}/${words.checked} — ` +
+    `${words.failures.length} TARGET(S) CANNOT BE TYPED`);
+  for (const f of words.failures) console.error(f);
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+
+document.body.classList.add('mode-practice');
+buildKeyboard();
+// Settings first, then the level: both are read OFF the DOM controls, whose
+// values the browser may have restored from before a reload.
+syncSettingsFromControls();
+loadLevel(els.level.value);
+updateStats();
+els.display.focus();
+runSelfTests();
+</script>
+</body>
+</html>
