@@ -1,0 +1,8 @@
+# unwrap/expect bị deny ở code thật (xem [workspace.lints] trong Cargo.toml):
+# một panic trong engine làm ibus-daemon respawn và mất preedit, hoặc làm Windows
+# âm thầm gỡ hook. Trong TEST thì ngược lại — ở đó panic CHÍNH LÀ cách báo lỗi,
+# và bắt viết let-else quanh mỗi assert chỉ làm test khó đọc hơn mà không an
+# toàn hơn.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true

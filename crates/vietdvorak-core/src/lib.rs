@@ -1,33 +1,33 @@
 //! Lõi Telex + Dvorak — logic thuần, không gọi OS, không dependency.
 //!
-//! # Trạng thái: M1 — `transform` CÒN LÀ STUB
-//!
-//! Milestone 1 cố ý dựng báo động trước khi có thứ để bảo vệ: workspace, binary
-//! line-protocol và arm thứ ba trong `check-parity.mjs` được xây TRƯỚC khi port
-//! FSM. Chạy `node check-parity.mjs` lúc này phải cho ĐỎ, với diff chỉ đích danh
-//! Rust và chỉ ở những vector thật sự cần biến đổi. Nếu nó xanh, hoặc đỏ ở chỗ
-//! không liên quan, thì chính cái harness sai — và đó là thứ M1 tồn tại để phát
-//! hiện, lúc còn rẻ.
-//!
-//! Xem [`transform`] để biết chính xác cái gì còn thiếu.
-//!
 //! # Hai layer
 //!
 //! - **Layer 1** — phím vật lý → ký tự Dvorak. KHÔNG nằm ở đây. Trên cả ba nền
-//!   tảng, layer 1 thuộc tầng layout của OS (Windows là ngoại lệ duy nhất tự làm
-//!   được, vì `WH_KEYBOARD_LL` nằm thượng nguồn tầng dịch layout). Lõi này nhận
-//!   ký tự ĐÃ qua Dvorak.
-//! - **Layer 2** — ký tự Dvorak → tiếng Việt có dấu. Chính là file này.
+//!   tảng, layer 1 thuộc tầng layout của OS (Windows là ngoại lệ duy nhất tự
+//!   làm được, vì `WH_KEYBOARD_LL` nằm thượng nguồn tầng dịch layout). Lõi này
+//!   nhận ký tự ĐÃ qua Dvorak.
+//! - **Layer 2** — ký tự Dvorak → tiếng Việt có dấu. Chính là crate này.
 //!
 //! # Nguồn sự thật
 //!
 //! `telex-conformance.txt` là spec, không phải `VietDvorak.ahk` và cũng không
-//! phải file này. 266 vector ở đó chạy qua BA engine: AHK, JS trong
-//! `practice.html`, và crate này qua `vdconform`.
+//! phải crate này. 266 vector ở đó chạy qua BA engine: `Transform()` của AHK,
+//! bản mirror JS trong `practice.html`, và crate này qua `vdconform`. Test
+//! trong crate chỉ pin những bất biến mà một vector đơn lẻ không phát biểu
+//! được — chúng không nhân bản spec, vì hai verdict cho một spec sẽ trôi khỏi
+//! nhau.
 
 #![no_std]
 
 extern crate alloc;
+
+mod nucleus;
+mod tables;
+mod tone;
+mod transform;
+mod vowel;
+
+pub use transform::Telex;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -41,9 +41,9 @@ use alloc::vec::Vec;
 /// đúng MỘT chỗ này, không rải if-else trong logic đặt dấu.
 ///
 /// `telex-conformance.txt` được sinh với giá trị `true`; lật hằng này đổi đúng
-/// các vector oa/oe/uy trong đó và không đổi gì khác — nên việc lật nó vốn đã là
-/// thao tác test được, và đó là lý do đây là một `const` có tên chứ chưa phải
-/// một file config.
+/// các vector oa/oe/uy trong đó và không đổi gì khác — nên việc lật nó vốn đã
+/// là thao tác test được, và đó là lý do đây là một `const` có tên chứ chưa
+/// phải một file config.
 pub const TONE_PLACEMENT_MODERN: bool = true;
 
 /// Phím này có KẾT THÚC âm tiết không?
@@ -54,38 +54,12 @@ pub const TONE_PLACEMENT_MODERN: bool = true;
 ///
 /// Luật này được viết ba lần trong dự án (ở đây, `isResetChar` trong
 /// `practice.html`, và `VkEndsSyllable` trong `VietDvorak.ahk`).
-/// `check-parity.mjs` quét `VkEndsSyllable` trên toàn dải VK và so từng phím với
-/// `isResetChar` — nên hai bản kia được canh lẫn nhau ở mức phím, còn bản này
-/// được canh ở mức TEXT bởi các vector `@section integration`.
+/// `check-parity.mjs` quét `VkEndsSyllable` trên toàn dải VK và so từng phím
+/// với `isResetChar` — nên hai bản kia được canh lẫn nhau ở mức PHÍM, còn bản
+/// này được canh ở mức TEXT bởi các vector `@section integration`.
 #[must_use]
 pub fn ends_syllable(key: char) -> bool {
     !key.is_ascii_alphabetic()
-}
-
-/// Một bước Telex: đưa `key` vào `buffer`, trả buffer mới.
-///
-/// # ĐÂY LÀ STUB
-///
-/// Bản thật port từ `VietDvorak.ahk:581-727` (`Transform()`) và phải làm:
-///
-/// - bảng nguyên âm × 6 dấu thanh, và bản HOA **suy ra** từ bảng thường chứ
-///   không chép tay — spec có vector pin đúng phép suy ra đó;
-/// - đặt dấu thông minh: `tieengs`→`tiếng`, `ngoaif`→`ngoài`, `soajn`→`soạn`,
-///   `Quynhf`→`Quỳnh`, cụm `qu`/`gi` bỏ qua, di trú dấu khi phụ âm cuối xuất hiện;
-/// - cặp dấu phụ `aa ee oo aw ow uw dd`, và escape khi bấm đôi (`aaa`→`aa`);
-/// - escape phím thanh bấm đôi (`ass`→`as`);
-/// - shortcut Unikey `w` trên buffer rỗng/phụ âm → `ư`, cùng cờ nhớ để `ww`→`w`;
-/// - chuẩn hoá nhân âm tiết (`uow`→`ươ`, `uu`→`ưu`).
-///
-/// Stub hiện tại chỉ append. Hệ quả có chủ đích: vector nào không cần biến đổi
-/// thì XANH, vector nào cần thì ĐỎ. Đó là hình dạng đúng của báo động ở M1 —
-/// plumbing đã đúng, chỉ thiếu FSM.
-#[must_use]
-pub fn transform(buffer: &[char], key: char) -> Vec<char> {
-    let mut out = Vec::with_capacity(buffer.len().saturating_add(1));
-    out.extend_from_slice(buffer);
-    out.push(key);
-    out
 }
 
 /// Kết quả của một lần gõ phím, ở dạng shell nào cũng hạ xuống được.
@@ -122,25 +96,29 @@ pub struct View {
 /// Trạng thái gõ của một ô nhập liệu.
 ///
 /// Cố ý CHƯA có `backspace()`. Bản AHK cắt buffer bằng `SubStr(g_buffer, 1, -1)`
-/// mà không chuẩn hoá lại, phá bất biến "tối đa một dấu, đúng tại target" và tạo
-/// ra được `mùà` (hai dấu). `telex-conformance.txt` có 266 vector và **zero
+/// mà không chuẩn hoá lại, phá bất biến "tối đa một dấu, đúng tại target" và
+/// tạo ra được `mùà` (hai dấu). `telex-conformance.txt` có 266 vector và **zero
 /// vector backspace**, nên AHK không thể làm oracle cho hành vi này — không có
 /// đáp án đúng nào để so.
 ///
-/// Backspace sẽ vào ở pha sau, bằng **replay** chứ không phải truncate: giữ lịch
-/// sử phím thô, pop, chạy lại `transform` từ rỗng. Đó là fix nguyên nhân gốc, và
-/// nó chỉ khả thi dưới preedit — nơi IME sở hữu vùng đang gõ nên buffer không
-/// còn phải mô hình hoá màn hình.
+/// Backspace sẽ vào ở pha sau, bằng **replay** chứ không phải truncate: giữ
+/// lịch sử phím thô, pop, chạy lại [`Telex::transform`] từ rỗng. Đó là fix
+/// nguyên nhân gốc, và nó chỉ khả thi dưới preedit — nơi IME sở hữu vùng đang
+/// gõ nên buffer không còn phải mô hình hoá màn hình.
 #[derive(Debug, Clone, Default)]
 pub struct Session {
     buf: Vec<char>,
+    telex: Telex,
 }
 
 impl Session {
     /// Phiên mới, buffer rỗng.
     #[must_use]
     pub fn new() -> Self {
-        Self { buf: Vec::new() }
+        Self {
+            buf: Vec::new(),
+            telex: Telex::new(),
+        }
     }
 
     /// Âm tiết đang gõ.
@@ -156,28 +134,32 @@ impl Session {
     /// thời điểm đó; IME được OS báo thẳng, nên cả khối ấy thu về một lời gọi.
     pub fn reset(&mut self) {
         self.buf.clear();
+        self.telex = Telex::new();
     }
 
     /// Đưa một ký tự qua đường apply đầy đủ: hỏi luật ngắt âm tiết trước, rồi
-    /// mới gọi [`transform`].
+    /// mới gọi [`Telex::transform`].
     ///
     /// Phím ngắt được chốt NGUYÊN VĂN cùng buffer — khớp bản AHK, nơi
-    /// `xin chaof` ra `xin chào` với dấu cách nằm trong text đã chốt. Shell IBus
-    /// sau này có thể chọn chốt buffer rồi *forward* phím ngắt thay vì tự chốt
-    /// nó; [`View`] mang đủ thông tin cho cả hai, nên đó là quyết định của shell
-    /// chứ không phải của lõi.
+    /// `xin chaof` ra `xin chào` với dấu cách nằm trong text đã chốt. Shell
+    /// IBus sau này có thể chọn chốt buffer rồi *forward* phím ngắt thay vì tự
+    /// chốt nó; [`View`] mang đủ thông tin cho cả hai, nên đó là quyết định của
+    /// shell chứ không phải của lõi.
     pub fn feed(&mut self, key: char) -> View {
         if ends_syllable(key) {
             let mut committed: String = self.buf.iter().collect();
             committed.push(key);
             self.buf.clear();
+            // Cờ shortcut `w` mô tả quan hệ giữa hai phím LIỀN NHAU trong cùng
+            // một âm tiết. Âm tiết đã chốt thì quan hệ đó không còn nghĩa.
+            self.telex = Telex::new();
             return View {
                 composing: String::new(),
                 committed,
                 consumed: true,
             };
         }
-        self.buf = transform(&self.buf, key);
+        self.buf = self.telex.transform(&self.buf, key);
         View {
             composing: self.composing(),
             committed: String::new(),
@@ -190,11 +172,6 @@ impl Session {
 mod tests {
     use super::*;
     use alloc::string::ToString;
-
-    // Luật ngắt âm tiết là thật ở M1 (nó là một dòng và không mơ hồ), nên nó
-    // được test thật. `transform` là stub nên KHÔNG có test hành vi Telex ở đây:
-    // spec sống trong telex-conformance.txt và chạy qua vdconform, không nhân
-    // bản thành một verdict thứ hai trong Rust.
 
     #[test]
     fn only_ascii_letters_continue_a_syllable() {
@@ -217,11 +194,11 @@ mod tests {
     #[test]
     fn break_char_commits_buffer_and_itself_then_clears() {
         let mut s = Session::new();
-        for c in "abc".chars() {
+        for c in "chaof".chars() {
             s.feed(c);
         }
         let v = s.feed(' ');
-        assert_eq!(v.committed, "abc ".to_string());
+        assert_eq!(v.committed, "chào ".to_string());
         assert_eq!(v.composing, "");
         assert_eq!(s.composing(), "");
     }
@@ -229,7 +206,7 @@ mod tests {
     #[test]
     fn reset_drops_the_syllable_without_committing_it() {
         let mut s = Session::new();
-        for c in "abc".chars() {
+        for c in "chaof".chars() {
             s.feed(c);
         }
         s.reset();
@@ -245,5 +222,16 @@ mod tests {
         let v = s.feed(' ');
         assert!(!v.committed.is_empty());
         assert!(v.composing.is_empty());
+    }
+
+    #[test]
+    fn the_w_shortcut_flag_does_not_leak_across_a_syllable_break() {
+        // "w" rồi cách rồi "w": phím w thứ hai mở một âm tiết mới, nên nó là
+        // shortcut đầy đủ chứ không phải nửa sau của một escape "ww".
+        let mut s = Session::new();
+        s.feed('w');
+        s.feed(' ');
+        s.feed('w');
+        assert_eq!(s.composing(), "ư");
     }
 }

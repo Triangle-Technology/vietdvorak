@@ -33,13 +33,20 @@
 use std::io::{self, BufWriter, Read, Write};
 use std::process::ExitCode;
 
-use vietdvorak_core::{Session, transform};
+use vietdvorak_core::{Session, Telex};
 
 /// Chạy `input` như một chuỗi phím chữ cái vào buffer rỗng, qua `transform` trần.
+///
+/// `Telex` mới cho MỖI vector: spec nói `@section transform` gõ vào buffer
+/// RỖNG, và cờ shortcut `w` là trạng thái của một âm tiết đang gõ dở. Dùng
+/// chung một máy trạng thái giữa các vector sẽ để vector trước đổi kết quả của
+/// vector sau — đúng loại phụ thuộc thứ tự khiến một suite đỏ lên khi có người
+/// sắp xếp lại file spec.
 fn run_transform(input: &str) -> String {
+    let mut telex = Telex::new();
     let mut buf: Vec<char> = Vec::new();
     for key in input.chars() {
-        buf = transform(&buf, key);
+        buf = telex.transform(&buf, key);
     }
     buf.into_iter().collect()
 }
