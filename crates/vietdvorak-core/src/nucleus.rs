@@ -49,10 +49,9 @@ pub(crate) fn match_horn_nucleus(shape: &[char]) -> Option<(&'static str, &'stat
 /// Cụm nguyên âm này có phải chính là DẠNG ĐÍCH của một luật chuẩn hoá không —
 /// tức dấu móc đã nằm đúng chỗ, không còn gì để sửa?
 ///
-/// # Nguyên tắc hàm này phục vụ
-///
-/// Escape (gõ lại phím trigger) chỉ được phép HUỶ DẤU MÓC DO CHÍNH NGƯỜI DÙNG
-/// GÕ RA, không bao giờ được huỷ dấu móc do ENGINE tự chèn khi chuẩn hoá vần.
+/// Hàm này phục vụ tiên đề **A4** (`PRINCIPLES.md`) — escape huỷ thứ NGƯỜI DÙNG
+/// gõ ra, không bao giờ huỷ thứ ENGINE tự chèn. Phát biểu chung sống ở đó; dưới
+/// đây chỉ là cách nó rơi vào đúng chỗ này:
 ///
 /// Người dùng gõ `dduwo` thì engine đã tự sửa `ưo` thành `ươ` (buffer `đươ`):
 /// dấu móc trên `ơ` là của engine. Phím `w` kế tiếp vì thế là THỪA — yêu cầu

@@ -89,9 +89,10 @@ pub(crate) struct NucleusRule {
 ///   khi có ký tự tiếp theo mới biết chắc vần không dừng ở dạng mở đó
 ///   (`thuơng` → `thương`).
 ///
-/// Nói gọn: eager khi vần sai ở mọi độ dài, lazy khi vần là dạng mở hợp lệ. Vì
-/// vậy điều kiện sống trong BẢNG chứ không phải trong if-else hỏi tên vần —
-/// thêm một vần mới chỉ là thêm một dòng ở đây.
+/// Luật chung — *eager khi vần sai ở mọi độ dài, lazy khi vần còn là dạng mở hợp
+/// lệ* — là tiên đề **A1.2** (`PRINCIPLES.md`), không viết lại ở đây. Hệ quả cho
+/// bảng này: cờ `lazy` là **dữ liệu của từng vần**, nên thêm một vần mới chỉ là
+/// thêm một dòng, không phải thêm một nhánh if-else hỏi tên vần.
 pub(crate) const NUCLEUS_NORMALIZE: [NucleusRule; 2] = [
     NucleusRule {
         shape: "ưo",

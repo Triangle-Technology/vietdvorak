@@ -4,8 +4,13 @@ Chỉ ghi những gì **riêng của dự án này**. Bốn nguyên tắc chung 
 first-principles, single source of truth, root-cause-clean) đã ở global — không
 chép lại ở đây.
 
-Lý do kiến trúc: [AD log](docs/architecture-decisions.md) — **và chỉ ở đó**. Bản đồ
-hệ thống: [ARCHITECTURE.md](ARCHITECTURE.md). Trạng thái: [ROADMAP.md](ROADMAP.md).
+Tiên đề của bài toán: [PRINCIPLES.md](PRINCIPLES.md). Lý do kiến trúc:
+[AD log](docs/architecture-decisions.md) — **và chỉ ở đó**. Bản đồ hệ thống:
+[ARCHITECTURE.md](ARCHITECTURE.md). Trạng thái: [ROADMAP.md](ROADMAP.md).
+
+Ba loại phát biểu, ba chỗ: *tiên đề* (tiếng Việt vốn dĩ như vậy) → PRINCIPLES ·
+*quyết định* (ngày D chốt X vì Y) → AD log · *chỉ dẫn* (khi sửa repo đừng làm X)
+→ file này. Lẫn chúng là tạo bản sao, và bản sao sẽ lệch.
 
 ---
 

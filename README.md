@@ -76,6 +76,7 @@ bài luyện gõ. Nó cũng chính là help của dự án.
 
 | | |
 |---|---|
+| [PRINCIPLES.md](PRINCIPLES.md) | **Tiên đề** — điều đúng về tiếng Việt và về sản phẩm, độc lập với code |
 | [docs/architecture-decisions.md](docs/architecture-decisions.md) | **AD log** — vì sao mỗi quyết định lớn là như vậy, và cái gì đã bị bác bỏ. Append-only, mỏ neo vĩnh viễn |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Bản đồ: hệ thống là gì, file ở đâu, cái gì chưa kiểm |
 | [ROADMAP.md](ROADMAP.md) | Đang ở đâu, cái gì chặn cái gì |

@@ -22,6 +22,9 @@
 > công việc trải nhiều commit **không có cách nào hợp lệ để ghi AD**.
 >
 > **Ranh giới với các file khác:** *lý do* sống ở đây và chỉ ở đây.
+> [PRINCIPLES.md](../PRINCIPLES.md) giữ **tiên đề** — điều đúng về tiếng Việt và về sản
+> phẩm, độc lập với code. AD **phái sinh từ** tiên đề và trỏ ngược lên khi cần; tiên đề
+> KHÔNG được chép xuống đây.
 > [ARCHITECTURE.md](../ARCHITECTURE.md) là bản đồ định hướng (hệ thống là gì, file ở đâu,
 > cái gì chưa kiểm) và **trỏ** vào đây. [CLAUDE.md](../CLAUDE.md) là bất biến khi sửa
 > repo. [ROADMAP.md](../ROADMAP.md) là trạng thái. Thấy một lý do bị chép ở hai chỗ →
