@@ -82,7 +82,19 @@ verify_applied() {
 python_free_replace() {
   # Thay bằng awk để không phụ thuộc regex escaping của sed — chuỗi Rust hay có
   # ký tự sed coi là siêu ký tự.
-  awk -v old="$OLD" -v new="$NEW" '
+  #
+  # LUẬT 5 — truyền chuỗi qua BIẾN MÔI TRƯỜNG, không qua `awk -v`.
+  #
+  # `awk -v x="..."` **tự diễn giải escape sequence**: `\r` thành CR, `\n` thành
+  # LF, `\t` thành TAB. Với source Rust/JS — đầy `\r\n?`, `[ \t]`, `\\` — nghĩa
+  # là chuỗi awk đi tìm KHÔNG PHẢI chuỗi bạn gõ, và phép thay lặng lẽ không xảy
+  # ra. `ENVIRON[]` đọc byte nguyên vẹn, không xử lý escape.
+  #
+  # Cùng lớp với luật 4 và cắn ngay sau nó (2026-08-16): một đột biến vào
+  # `stripAhkComments` của `check-parity.mjs` không áp được, và chỉ có bước
+  # `cmp` thêm ở luật 4 mới lộ ra — nếu không thì nó đã báo "SỐNG SÓT" lần nữa.
+  VD_OLD="$OLD" VD_NEW="$NEW" awk '
+    BEGIN { old = ENVIRON["VD_OLD"]; new = ENVIRON["VD_NEW"] }
     { line = $0; out = ""
       while ((i = index(line, old)) > 0) {
         out = out substr(line, 1, i-1) new

@@ -2267,6 +2267,38 @@ const HOTKEY_PREFIX_EXEMPT = [
 // key still reach the application and "*" is what makes it fire while a modifier
 // is down; dropping either changes the input method in a way no vector can see,
 // because none of this can be executed under test.
+// The guard above reads the shipped .ahk AS TEXT, so it is only as trustworthy as the
+// bytes it was handed — and those bytes differ between a Windows checkout and a Linux
+// one unless something pins them. .gitattributes pins them now, which is the root fix,
+// but that fix also REMOVES the only thing that was accidentally exercising the CRLF
+// path: from here on every checkout is LF, so a reintroduced line-ending bug would sit
+// undetected until someone clones with core.autocrlf=true.
+//
+// So the guard has to prove itself instead of relying on the environment to do it: run
+// the same assertion against a CRLF copy of the same source and require the same
+// answer. Costs microseconds; would have turned the 2026-08-16 CI failure red on the
+// developer's own machine, months earlier. See AD-18, and CLAUDE.md on guards having to
+// be shown to bite.
+function assertLineEndingAgnostic(ahkSrc) {
+  const lf = ahkSrc.replace(/\r\n?/g, '\n');
+  const crlf = lf.replace(/\n/g, '\r\n');
+  const count = (src) => hotkeyFirstArgs(stripAhkComments(src)).length;
+  const [a, b] = [count(lf), count(crlf)];
+  if (a !== b) {
+    die(`the Hotkey() reader is line-ending sensitive: ${a} call(s) with LF, ${b} with CRLF.\n`
+      + '            Whatever it reads from VietDvorak.ahk therefore depends on who checked the\n'
+      + '            file out, and so does this run\'s verdict. In JavaScript "." does not match\n'
+      + '            "\\r", so a regex anchored with "$" silently fails on a CRLF line — that is\n'
+      + '            the bug this check exists to catch, and it has shipped once already.');
+  }
+  // Belt and braces: the count above catches the known shape, this catches the rest.
+  // die() exits rather than throwing, so it cannot be wrapped — the line below is what
+  // gives the next failure its context, because the message that follows will look like
+  // an ordinary registration failure and is not one.
+  harnessNotes.push('registration guard re-checked against a CRLF copy of the source (AD-18)');
+  assertHotkeyPrefixes(crlf);
+}
+
 function assertHotkeyPrefixes(ahkSrc) {
   const src = stripAhkComments(ahkSrc);
   const consts = sliceStringConstants(src);
@@ -2549,8 +2581,19 @@ function sliceAhkBreakRule(src) {
 
 // AHK end-of-line comments, so a `Hotkey(` mentioned in prose is not mistaken for
 // a registration.
+// NORMALISE FIRST, then strip. Splitting on '\n' alone leaves a trailing '\r' on a
+// CRLF checkout, and in JavaScript '.' does NOT match '\r' — it is a line terminator —
+// so `.*$` cannot reach the end of such a line and the comment SURVIVES. That is not a
+// theoretical hazard: it shipped, and the first CI run this repo ever did went red on
+// it, because one surviving comment happened to contain the word "Hotkey()" and the
+// registration guard counted a ninth, empty registration.
+//
+// .gitattributes now pins eol=lf so the bytes are the same everywhere, which is the
+// root fix. This line is defence in depth: a parser that miscounts on CRLF is fragile
+// no matter what git is configured to do, and assertLineEndingAgnostic() below proves
+// this function stays agnostic even after .gitattributes makes CRLF rare.
 function stripAhkComments(text) {
-  return text.split('\n').map(l => l.replace(/(^|[ \t]);.*$/, '$1')).join('\n');
+  return text.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/(^|[ \t]);.*$/, '$1')).join('\n');
 }
 
 // First argument of every Hotkey() call in the block. Paren- and quote-aware, so
@@ -2895,6 +2938,7 @@ function buildHarness(ahkSrc) {
   // ...and the "~*" prefix over the WHOLE file, because a registration one line
   // past the banner is still a registration in the shipped input method.
   assertHotkeyPrefixes(ahkSrc);
+  assertLineEndingAgnostic(ahkSrc);
   // The two things the harness cannot read off its own slice: how many entries
   // that slice was SUPPOSED to carry (asserted at run time by HarnessMain), and
   // the char -> VK table, which belongs to the harness and not to the shipped

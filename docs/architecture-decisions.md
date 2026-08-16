@@ -439,3 +439,59 @@ ASCII (người ta gõ `dd`, không gõ `đ`); `@section transform` còn giới 
 **Hệ quả cho cách đọc cổng**: `cargo test` xanh không đủ, và **`check-parity.mjs` xanh
 cũng không đủ**. Hai cổng phủ hai vùng khác nhau và chỉ giao nhau một phần. Cổng thật là
 **cả hai**.
+
+---
+
+## AD-18 — Kết thúc dòng là LF, ghim bằng `.gitattributes`; và guard phải tự chứng minh sau đó
+**Ngày**: 2026-08-16 · **Trạng thái**: locked
+
+**Bối cảnh — lần đầu CI chạy thật, nó đỏ:**
+
+```
+check-parity: could not prove the "~*" prefix is present in 1 registration(s)
+              Hotkey(, ...)
+```
+
+Máy dev có LF; GitHub Actions checkout ra CRLF. `check-parity.mjs :: stripAhkComments`
+tách theo `\n` nhưng **để lại `\r`**, và trong JavaScript `.` **không khớp `\r`** (nó là
+line terminator) — nên `/(^|[ \t]);.*$/` không neo được tới cuối dòng và comment **sống
+sót**. Dòng sống sót đó tình cờ chứa chữ `Hotkey()`:
+
+```ahk
+HotIf()   ; trả ngữ cảnh về mặc định cho mọi Hotkey() đăng ký sau này
+```
+
+Parser đếm ra registration thứ chín, rỗng, rồi đòi chứng minh tiền tố `~*` cho nó.
+
+**Tám vòng code review và MỌI lần chạy cục bộ đều bỏ sót**, vì mọi lần chạy cục bộ đều có
+LF. Không có gì sai trong logic; sai ở chỗ **cùng một file có byte khác nhau tuỳ máy**.
+
+**Quyết định 1 — root fix: ghim `eol=lf` bằng `.gitattributes`.** `check-parity.mjs` là
+verdict duy nhất ([AD-2](#ad-2)) và nó đọc `VietDvorak.ahk` / `practice.html` /
+`telex-conformance.txt` **như văn bản** — cắt engine giữa hai marker, quét dải VK, đọc
+khối đăng ký như text vì không thể thực thi nó dưới test. **Một khác biệt BYTE là một
+khác biệt VERDICT.** Lý do thứ hai, độc lập: `scripts/dot-bien.sh` là shell script, và
+CRLF làm nó không chạy được trên Linux (`bad interpreter`) — Linux là nền tảng đích.
+
+**Quyết định 2 — phòng vệ sâu: `stripAhkComments` chuẩn hoá trước khi tách.** Một parser
+đếm sai khi gặp CRLF là parser giòn bất kể git cấu hình thế nào.
+
+**Quyết định 3 — và đây mới là phần dễ bỏ sót: guard phải TỰ chứng minh sau khi root fix
+làm mất môi trường thử nó.** Ghim `eol=lf` cũng **xoá luôn thứ duy nhất đang tình cờ chạy
+thử đường CRLF**: từ đây mọi checkout đều LF, nên một lỗi line-ending tái phát sẽ nằm im
+cho tới khi ai đó clone với `core.autocrlf=true`.
+
+Nên `assertLineEndingAgnostic()` chạy chính phép đếm ấy trên một bản CRLF của cùng source
+và đòi hai bên ra cùng kết quả. Đã chứng minh nó cắn bằng đột biến (gỡ phép chuẩn hoá →
+`the Hotkey() reader is line-ending sensitive: 8 call(s) with LF, 9 with CRLF`), **trên
+một checkout LF** — tức nó bắt được thứ mà chính CI sau khi fix sẽ không còn bắt được.
+
+**Hệ quả cho `scripts/dot-bien.sh` — luật 5:** đột biến này ban đầu **không áp được**, vì
+`awk -v` tự diễn giải escape (`\r` → CR, `\n` → LF) nên chuỗi awk đi tìm không phải chuỗi
+đã gõ. Chỉ có bước `cmp` thêm ở luật 4 mới lộ ra; nếu không nó đã báo "SỐNG SÓT" lần thứ
+hai. Nay truyền qua biến môi trường và đọc bằng `ENVIRON[]`, thứ không xử lý escape — nếu
+không, script vô dụng với mọi source Rust/JS có dấu `\`.
+
+**Bài học chung**: hai lần trong một ngày, một công cụ kiểm chứng báo "không sao" cho một
+phép kiểm **chưa bao giờ chạy**. Cả hai lần đều được bắt bởi một bước xác minh *phép kiểm
+đã thực sự xảy ra*, không phải bởi việc đọc lại kết quả.

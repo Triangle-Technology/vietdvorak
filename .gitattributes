@@ -1,0 +1,37 @@
+# Kết thúc dòng LF, ổn định qua mọi máy và mọi lần checkout.
+#
+# ⚠ ĐÂY LÀ FILE CHỊU LỰC, KHÔNG PHẢI THẨM MỸ — đừng xoá.
+#
+# `check-parity.mjs` là verdict duy nhất của repo (AD-2), và nó đọc
+# `VietDvorak.ahk`, `practice.html`, `telex-conformance.txt` **NHƯ VĂN BẢN**: cắt
+# engine JS giữa hai marker, quét toàn bộ dải VK của luật ngắt âm tiết, và đọc khối
+# đăng ký hotkey như text vì không thể thực thi nó dưới test. Một khác biệt BYTE giữa
+# hai máy là một khác biệt VERDICT.
+#
+# Không phải giả thuyết — nó đã nổ, 2026-08-16, ở đúng lần đầu CI chạy thật:
+#
+#     check-parity: could not prove the "~*" prefix is present in 1 registration(s)
+#                   Hotkey(, ...)
+#
+# Máy dev có LF, GitHub Actions checkout ra CRLF. `stripAhkComments` tách theo `\n`
+# nhưng để lại `\r`; trong JavaScript `.` KHÔNG khớp `\r` (nó là line terminator), nên
+# `/(^|[ \t]);.*$/` không neo được và một dòng comment sống sót — dòng đó tình cờ chứa
+# chữ `Hotkey()`, thế là parser đếm ra một registration thứ chín, rỗng.
+#
+# Tám vòng code review và mọi lần chạy cục bộ đều bỏ sót, vì mọi lần chạy cục bộ đều
+# có LF. Xem AD-18.
+#
+# `scripts/dot-bien.sh` là lý do thứ hai, độc lập: một shell script CRLF không chạy
+# được trên Linux (`bad interpreter`), và Linux là nền tảng đích của dự án.
+* text=auto eol=lf
+
+# Nói rõ cho các loại chịu lực (thừa về mặt kỹ thuật, nhưng đọc là hiểu ngay).
+*.ahk  text eol=lf
+*.txt  text eol=lf
+*.html text eol=lf
+*.mjs  text eol=lf
+*.rs   text eol=lf
+*.toml text eol=lf
+*.md   text eol=lf
+*.sh   text eol=lf
+*.yml  text eol=lf
