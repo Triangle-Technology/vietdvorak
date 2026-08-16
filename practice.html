@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VietDvorak Practice</title>
+<title>VietDvorak for Windows — Practice</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%237aa2f7'/%3E%3Ctext x='50%25' y='52' font-family='system-ui,sans-serif' font-size='44' font-weight='700' fill='%231a1b26' text-anchor='middle'%3EĐ%3C/text%3E%3C/svg%3E">
 <style>
   :root {
@@ -43,6 +43,12 @@
     font-size: 20px;
     color: var(--accent);
     font-weight: 600;
+  }
+  header h1 .platform-tag {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 4px;
   }
   .header-mid {
     display: flex;
@@ -457,7 +463,7 @@
 <body>
   <div id="container">
     <header>
-      <h1>VietDvorak</h1>
+      <h1>VietDvorak <span class="platform-tag">for Windows</span></h1>
       <div class="mode-toggle">
         <button class="mode-btn active" data-mode="practice">Luyện tập</button>
         <button class="mode-btn" data-mode="free">Gõ tự do</button>

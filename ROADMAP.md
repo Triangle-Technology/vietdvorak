@@ -44,7 +44,7 @@ hai rẻ hơn rất nhiều so với việc phát hiện muộn.
 ### M0.a — Gạch chân có chịu được không? *(20 phút)*
 
 Rủi ro sản phẩm cao nhất của dự án. IBus vẽ gạch chân dưới âm tiết đang gõ, và
-trên Ubuntu 26.04 **không tắt được** (§5 của ARCHITECTURE.md). Bản AHK anh đang
+trên Ubuntu 26.04 **không tắt được** ([AD-7](docs/architecture-decisions.md#ad-7)). Bản AHK anh đang
 dùng thì gõ thẳng, không có gạch chân — nên đây là thay đổi anh sẽ nhìn thấy mọi
 lúc, mọi ngày.
 
@@ -67,8 +67,8 @@ duy nhất: sống được với nó không?
 
 ### M0.b — `<layout_variant>` có bị nuốt thật không? *(5 phút)*
 
-Có thể lật đổ tiểu mục **Cơ chế layer 1 trên Ubuntu** của §4 (và cùng với nó là
-nhu cầu ship named XKB layout ở M9). Lựa chọn IBus-thay-vì-evdev và
+Có thể lật đổ [AD-6](docs/architecture-decisions.md#ad-6) (và cùng với nó là nhu
+cầu ship named XKB layout ở M9) — đó là lý do AD đó đang ở trạng thái `draft`. Lựa chọn IBus-thay-vì-evdev và
 IBus-thay-vì-fcitx5 KHÔNG phụ thuộc vào kết quả này. Kết luận hiện tại là **suy
 luận từ source code gnome-shell, không phải quan sát**.
 
@@ -98,9 +98,9 @@ GitHub Actions không cần X server.
   ngừng nhận tiếng Việt".
 - Lần gửi live đầu tiên làm trong VM hoặc TTY bỏ được, **không phải session duy
   nhất**.
-- Assert lúc bring-up: bấm `a`, keycode phải về **30**. Xem §9 của
-  ARCHITECTURE.md — dữ kiện này đã đảo chiều hai lần.
-- Thêm `deny.toml` ban crate network cùng lúc `zbus` vào (§8).
+- Assert lúc bring-up: bấm `a`, keycode phải về **30**. Xem
+  [AD-14](docs/architecture-decisions.md#ad-14) — dữ kiện này đã đảo chiều hai lần.
+- Thêm `deny.toml` ban crate network cùng lúc `zbus` vào ([AD-10](docs/architecture-decisions.md#ad-10)).
 
 **WSL2 không làm được layer 1**, về mặt cấu trúc: cơ chế nằm trong gnome-shell,
 còn WSLg chạy Weston. Đừng cố test nó ở đó.

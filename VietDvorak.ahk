@@ -33,7 +33,7 @@ A_MaxHotkeysPerInterval := 200
 ; Distinct tray icon + tooltip so it doesn't blend with other AHK scripts.
 ; The icon itself is drawn at runtime in UpdateTrayIcon() — orange square with
 ; "V" (Vietnamese mode) or "E" (English mode) — so mode is visible at a glance.
-global TRAY_TIP_BASE := "VietDvorak — Vietnamese Telex (double-tap CapsLock to toggle EN/VN)"
+global TRAY_TIP_BASE := "VietDvorak for Windows — Vietnamese Telex (double-tap CapsLock to toggle EN/VN)"
 A_IconTip := TRAY_TIP_BASE
 
 ; ============================================================================
@@ -1030,7 +1030,7 @@ ShowHelp(*) {
         }
     }
     g_helpGui := Gui("+AlwaysOnTop +ToolWindow -MinimizeBox",
-                     "VietDvorak — Phím tắt && cách gõ")
+                     "VietDvorak for Windows — Phím tắt && cách gõ")
     g_helpGui.MarginX := 20
     g_helpGui.MarginY := 16
     g_helpGui.BackColor := "FFFFFF"

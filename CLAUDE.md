@@ -4,8 +4,8 @@ Chỉ ghi những gì **riêng của dự án này**. Bốn nguyên tắc chung 
 first-principles, single source of truth, root-cause-clean) đã ở global — không
 chép lại ở đây.
 
-Lý do kiến trúc: [ARCHITECTURE.md](ARCHITECTURE.md). Trạng thái:
-[ROADMAP.md](ROADMAP.md).
+Lý do kiến trúc: [AD log](docs/architecture-decisions.md) — **và chỉ ở đó**. Bản đồ
+hệ thống: [ARCHITECTURE.md](ARCHITECTURE.md). Trạng thái: [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -25,22 +25,35 @@ Spec là thứ chúng chia sẻ.
   trong `check-parity.mjs` phải **khớp** phần văn xuôi trong header file spec —
   hai chỗ đó nói cùng một điều, đừng để một bên đổi mà bên kia không.
 
-## 2. Đừng tuyên bố gì trước khi chạy `node check-parity.mjs`
+## 2. Quyết định kiến trúc ⇒ append một AD, không sửa AD cũ
+
+[AD log](docs/architecture-decisions.md) là chỗ **duy nhất** lý do được sống. Không sửa
+entry `locked`; thay một quyết định ⇒ entry mới + ghi `superseded by AD-x` vào entry cũ.
+Entry `draft` sửa tự do cho tới commit cuối của công việc nó mô tả.
+
+**Trỏ bằng `AD-n`, đừng trỏ bằng `§n`.** Số AD là mỏ neo vĩnh viễn; số mục dịch chuyển khi
+ai đó chèn một mục vào giữa file, và dịch chuyển **im lặng**. Cùng lớp lỗi với số dòng —
+luật đó repo này đã viết hai lần (`viet-corpus.mjs`, `check-parity.mjs`) rồi vẫn tái phạm.
+
+**Đừng chốt dải số AD** (`AD-1…AD-16`) ở file ra lệnh nào. Dải cứng luôn bỏ sót AD mới
+nhất — tức đúng phần vừa viết. Bảo *"đọc AD log"*.
+
+## 3. Đừng tuyên bố gì trước khi chạy `node check-parity.mjs`
 
 Nó là verdict. `cargo test` xanh không có nghĩa engine đúng — nó chỉ có nghĩa các
 bất biến ở §1 còn giữ.
 
-## 3. `VietDvorak.ahk` là oracle. Đừng sửa ngữ nghĩa của nó.
+## 4. `VietDvorak.ahk` là oracle. Đừng sửa ngữ nghĩa của nó.
 
 Nó vừa là bộ gõ đang dùng hàng ngày, vừa là bên thứ hai trong phép so ba chiều.
 Sửa hành vi của nó là **dịch chuyển baseline mà bản port đang cố khớp**.
 
-Nó có một defect đã biết (backspace tạo được hai dấu — §6 của ARCHITECTURE.md).
+Nó có một defect đã biết (backspace tạo được hai dấu — [AD-9](docs/architecture-decisions.md#ad-9)).
 Đó là **cố ý chưa sửa**, và lý do nằm ở đó. Nếu bug cắn thật khi dùng hàng ngày:
 backport thiết kế replay *đã validate bằng Rust* ngược sang AHK. Đừng phát minh
 ngữ nghĩa hai lần.
 
-## 4. Không dependency nào vào lõi
+## 5. Không dependency nào vào lõi
 
 `crates/vietdvorak-core` có **zero dependency**, và CI enforce điều đó bằng
 `cargo tree`. Đây là thuộc tính **bảo mật**, không phải thẩm mỹ: mọi crate trên
@@ -49,7 +62,7 @@ ngữ nghĩa hai lần.
 Shell được phép có dependency, nhưng tối thiểu, và mỗi cái phải trả lời được câu
 "crate này thấy được gì".
 
-## 5. Suy ra, đừng chép
+## 6. Suy ra, đừng chép
 
 `VOWELS` và `DIACRITIC_PAIRS` là hai bảng **được suy ra TỪ** — code gọi chúng là
 "bảng gốc". Chữ hoa suy ra bằng Unicode (`vowel.rs`); escape và w-modifier đọc
@@ -65,10 +78,10 @@ Thêm một cặp ở `DIACRITIC_PAIRS` thì escape và w-modifier tự đúng t
 Ở đâu thấy một bảng thứ hai đang được giữ đồng bộ bằng tay, đó là bug đang chờ.
 *(Hai cái đang tồn tại: `MODIFIED` trong `tone.rs` — đúng bằng phần nguyên âm của
 `DIACRITIC_PAIRS`, suy ra được nhưng đang chép tay; và bảng phím Dvorak, hiện bị
-chép ở CẢ `practice.html :: KEYBOARD_LAYOUT` lẫn `viet-corpus.mjs` — §3 của
-ARCHITECTURE.md.)*
+chép ở CẢ `practice.html :: KEYBOARD_LAYOUT` lẫn `viet-corpus.mjs` — xem §Nợ đã
+biết trong ARCHITECTURE.md.)*
 
-## 6. Đừng xây seam cho consumer chưa tồn tại
+## 7. Đừng xây seam cho consumer chưa tồn tại
 
 Một seam chỉ có một consumer là seam chưa được kiểm chứng. Nhánh injection của
 `View` **chưa được xây** dù `View.committed` đã có chỗ cho nó — vì
@@ -78,16 +91,16 @@ port khi có shell Windows thật.
 Cùng lý do: chưa có `deny.toml` (chưa có dependency để ban), chưa có
 `ACCEPTANCE.md` (chưa có shell để test thủ công).
 
-## 7. Kiểm chứng bằng phần cứng, không bằng tài liệu
+## 8. Kiểm chứng bằng phần cứng, không bằng tài liệu
 
-§9 của ARCHITECTURE.md liệt kê những khẳng định về GNOME/IBus **chưa từng được
-quan sát trên máy Ubuntu thật**. Một trong số đó đã đảo chiều **hai lần** qua ba
-vòng nghiên cứu (IBus giao keycode hệ nào).
+[AD-14](docs/architecture-decisions.md#ad-14) là luật; bảng "Chưa kiểm trên phần
+cứng thật" trong ARCHITECTURE.md là danh sách. Một dữ kiện trong đó đã đảo chiều
+**hai lần** qua ba vòng nghiên cứu (IBus giao keycode hệ nào).
 
 Đừng hardcode một dữ kiện nền tảng vì tài liệu nói vậy. Pin nó bằng một assert
 lúc bring-up.
 
-## 8. Guard phải được chứng minh là cắn
+## 9. Guard phải được chứng minh là cắn
 
 Thêm một guard thì thêm luôn cách chứng minh nó chặn thật, không chỉ chứng minh
 đường xanh vẫn xanh. Tiền lệ trong repo:
@@ -102,7 +115,7 @@ Bước thứ hai được thêm SAU khi file này lần đầu khẳng định 
 nó không. Hành vi vẫn luôn đúng, nhưng nó mới chỉ được kiểm bằng tay một lần —
 đúng thứ mục này cấm.
 
-## 9. Ngôn ngữ
+## 10. Ngôn ngữ
 
 Chú thích lý do, **doc comment** (`///`, `//!`) và **thông báo lỗi**: tiếng Việt
 — kể cả doc API của Rust và stderr của `vdconform` / `VietDvorak.ahk`. Chỉ **tên
