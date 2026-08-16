@@ -1,0 +1,108 @@
+name: CI
+
+# Cổng duy nhất mà một PR phải qua. Nguyên tắc: mọi thứ ở đây phải FAIL được —
+# một job không bao giờ đỏ được là một job không kiểm gì cả.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  spec:
+    # Windows vì đây là job DUY NHẤT chạy được cả ba engine: VietDvorak.ahk cần
+    # AutoHotkey, và AutoHotkey chỉ có trên Windows. Không tách nhỏ ra — giá trị
+    # của check-parity.mjs nằm ở chỗ ba engine được so với nhau TRONG MỘT LẦN
+    # CHẠY, nên chia nó ra nhiều job là vứt bỏ đúng thứ nó đo.
+    name: spec — three engines
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # AutoHotkey được PIN theo version VÀ theo SHA256, khác với các bước khác.
+      # Lý do: đây là binary bên thứ ba mà CI đem THỰC THI. Với một dự án mà
+      # bản thân sản phẩm đọc mọi phím người dùng gõ, "tải bản mới nhất rồi
+      # chạy" là một bề mặt cung ứng không tương xứng với phần còn lại.
+      #
+      # Nâng version là một hành động CÓ CHỦ Ý và phải thấy được trong diff:
+      # đổi cả hai dòng dưới. 2.0.26 là bản chủ dự án đang chạy trên máy, nên CI
+      # và máy dev thực thi cùng một engine — nếu chúng khác nhau thì "xanh trên
+      # CI, đỏ ở nhà" trở thành một khả năng, và đó là loại lỗi đắt nhất.
+      - name: Install AutoHotkey v2 (pinned)
+        shell: pwsh
+        run: |
+          $version = '2.0.26'
+          $expected = '43522AA3122A57784AC5DB30ABF85C2244475C36ACD7796E2C993355F9E926AE'
+          $zip = Join-Path $env:RUNNER_TEMP 'ahk.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'ahk'
+          $url = "https://github.com/AutoHotkey/AutoHotkey/releases/download/v$version/AutoHotkey_$version.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($actual -ne $expected) {
+            throw "AutoHotkey_$version.zip has SHA256 $actual, expected $expected. Refusing to run it."
+          }
+          Expand-Archive -Path $zip -DestinationPath $dir
+          $exe = Join-Path $dir 'AutoHotkey64.exe'
+          if (-not (Test-Path $exe)) { throw "AutoHotkey64.exe not found in the archive" }
+          Add-Content -Path $env:GITHUB_ENV -Value "AUTOHOTKEY_EXE=$exe"
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --workspace --locked
+
+      # Bản checkable của lời hứa trong crates/vietdvorak-core/Cargo.toml. Mọi
+      # crate trên đường đi của phím đọc được mọi thứ người dùng gõ, nên "zero
+      # dependency" là một thuộc tính BẢO MẬT — và một thuộc tính bảo mật chỉ
+      # tồn tại trong comment là một thuộc tính sẽ biến mất trong PR nào đó.
+      - name: The core has no dependencies
+        shell: pwsh
+        run: |
+          $deps = cargo tree -p vietdvorak-core --edges normal --prefix none --locked |
+                  Select-Object -Skip 1 | Where-Object { $_.Trim() }
+          if ($deps) {
+            throw "vietdvorak-core must have zero dependencies, found:`n$($deps -join "`n")"
+          }
+
+      # Verdict thật. Chạy CUỐI vì nó là thứ đắt nhất và là thứ duy nhất cần cả
+      # ba engine — nếu fmt/clippy/test đã đỏ thì không cần biết thêm.
+      - name: Conformance — all three engines
+        run: node check-parity.mjs
+
+      # Giữ đúng lời hứa in ra ở đầu check-parity.mjs: bỏ qua một engine mua
+      # được một lần chạy yên tĩnh hơn, KHÔNG mua được một lần chạy xanh. Không
+      # có bước này thì lời hứa đó chỉ là văn xuôi, và một PR "sửa" hai cờ kia
+      # thành exit 0 sẽ đi qua mà không ai thấy — rồi CI xanh mãi mãi với engine
+      # chưa từng được chạy một lần nào.
+      - name: A skipped engine can never be green
+        shell: pwsh
+        run: |
+          foreach ($flag in '--skip-ahk', '--skip-rust') {
+            node check-parity.mjs $flag | Out-Null
+            if ($LASTEXITCODE -eq 0) { throw "$flag exited 0 — half a check is not a pass" }
+            Write-Host "$flag exited $LASTEXITCODE, as it must"
+          }
+
+  linux-gate:
+    # Lõi còn compile cho Linux không. `check` chứ không phải `build`: xem lý do
+    # trong rust-toolchain.toml. Job này tồn tại để shell IBus sắp tới không bắt
+    # đầu bằng việc phát hiện lõi đã lệch khỏi target thật từ lâu.
+    name: linux gate — musl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for x86_64-unknown-linux-musl
+        run: cargo check --workspace --all-targets --locked --target x86_64-unknown-linux-musl
