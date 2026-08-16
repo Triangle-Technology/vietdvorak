@@ -82,6 +82,26 @@ jobs:
       - name: Conformance — all three engines
         run: node check-parity.mjs
 
+      # README.md và ROADMAP.md chép nguyên văn dòng PASS để người đọc thấy ngay
+      # dự án đang ở đâu. Con số trong đó là dữ liệu, và dữ liệu bị chép tay ở
+      # ba chỗ thì hai chỗ sẽ sai — thêm một vector là hai tài liệu lặng lẽ nói
+      # dối, đúng thứ repo này bắt lỗi rất gắt ở mọi chỗ khác.
+      #
+      # Không bỏ con số khỏi tài liệu: chính con số cụ thể làm chúng thuyết
+      # phục. Thay vào đó bắt chúng phải đúng.
+      - name: The docs quote the current PASS line verbatim
+        shell: pwsh
+        run: |
+          $out = node check-parity.mjs
+          if ($LASTEXITCODE -ne 0) { throw "check-parity failed; earlier step should have caught this" }
+          $line = $out[0].Trim()
+          foreach ($doc in 'README.md', 'ROADMAP.md') {
+            if (-not (Select-String -Path $doc -SimpleMatch -Pattern $line -Quiet)) {
+              throw "$doc does not quote the current verdict.`nExpected to find: $line"
+            }
+            Write-Host "$doc quotes it"
+          }
+
       # Giữ đúng lời hứa in ra ở đầu check-parity.mjs: bỏ qua một engine mua
       # được một lần chạy yên tĩnh hơn, KHÔNG mua được một lần chạy xanh. Không
       # có bước này thì lời hứa đó chỉ là văn xuôi, và một PR "sửa" hai cờ kia
@@ -95,6 +115,23 @@ jobs:
             if ($LASTEXITCODE -eq 0) { throw "$flag exited 0 — half a check is not a pass" }
             Write-Host "$flag exited $LASTEXITCODE, as it must"
           }
+
+      # Bước "Install AutoHotkey v2" ở trên là thứ duy nhất đứng giữa job này và
+      # một lần chạy chỉ có hai engine. Nếu nó hỏng — URL đổi, asset đổi tên,
+      # zip đổi cấu trúc — parity PHẢI đỏ, chứ không được lặng lẽ tụt xuống còn
+      # JS + Rust và vẫn in ra một dòng nghe như thành công.
+      #
+      # Hành vi đã đúng sẵn (findAutoHotkey -> loudSkip -> exit khác 0). Bước
+      # này tồn tại vì cho tới lúc có nó, điều đó mới chỉ được kiểm BẰNG TAY một
+      # lần, và một guard chưa được chứng minh là cắn thì chưa phải một guard.
+      - name: A broken AutoHotkey install must turn the build red
+        shell: pwsh
+        env:
+          AUTOHOTKEY_EXE: C:\nonexistent\AutoHotkey64.exe
+        run: |
+          node check-parity.mjs | Out-Null
+          if ($LASTEXITCODE -eq 0) { throw "missing AutoHotkey exited 0 — a broken install must be red" }
+          Write-Host "missing AutoHotkey exited $LASTEXITCODE, as it must"
 
   linux-gate:
     # Lõi còn compile cho Linux không. `check` chứ không phải `build`: xem lý do

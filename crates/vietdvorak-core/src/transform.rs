@@ -263,7 +263,10 @@ mod tests {
 
     // Các test dưới đây KHÔNG nhân bản spec — chúng pin những bất biến mà một
     // vector đơn lẻ không nói ra, và mỗi cái có lý do riêng để tồn tại. Verdict
-    // trên 266 vector sống ở check-parity.mjs.
+    // trên toàn bộ vector sống ở check-parity.mjs.
+    //
+    // Đừng chép SỐ vector vào chú thích. Con số sống đúng một chỗ — output của
+    // harness. Ba chỗ trong repo này từng sai vì chép nó.
 
     #[test]
     fn tone_order_does_not_matter() {

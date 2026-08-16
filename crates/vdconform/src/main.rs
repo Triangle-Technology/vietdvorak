@@ -18,7 +18,7 @@
 //! dựng sẵn cho arm AHK (`runAhkVectors` ghi ra `vectors.tsv` cùng định dạng),
 //! nên arm thứ ba tái dùng luôn hình dạng đó thay vì phát minh cái mới.
 //!
-//! Hai section, đúng như `telex-conformance.txt` định nghĩa:
+//! Ba section, đúng như `telex-conformance.txt` định nghĩa:
 //!
 //! - `transform` — `input` là chuỗi phím CHỮ CÁI vào buffer RỖNG. Từng ký tự
 //!   qua `transform()`; kết quả là buffer sau ký tự cuối.

@@ -73,10 +73,10 @@ pub fn ends_syllable(key: char) -> bool {
 /// nhau, nên `committed` là field RIÊNG BIỆT khỏi `composing`, không phải một
 /// chuỗi duy nhất mà shell tự đoán:
 ///
-/// - **IME (IBus, và sau này IMKit)** — `composing` vào `UpdatePreeditText`,
-///   `committed` vào `CommitText`.
+/// - **IME (IBus, và sau này InputMethodKit)** — `composing` vào
+///   `UpdatePreeditText`, `committed` vào `CommitText`.
 /// - **Injection (Windows hook)** — diff `composing` rồi phát backspace + text,
-///   theo đúng thuật toán `SyncToScreen()` ở `VietDvorak.ahk:729`.
+///   theo đúng thuật toán `VietDvorak.ahk :: SyncToScreen()`.
 ///
 /// # Ba mệnh đề mà shell injection PHẢI theo
 ///
@@ -116,8 +116,9 @@ pub struct View {
 ///
 /// Đây là hành vi MỚI, không phải port: AHK không thể làm oracle cho nó, vì
 /// truncate và replay khác nhau ở gần như mọi input (`tieengs` ⌫ cho `tiến` so
-/// với `tiêng`). `telex-conformance.txt` có 266 vector và zero vector
-/// backspace, nên cũng không có luật cũ nào bị vi phạm.
+/// với `tiêng`). TRƯỚC `@section backspace`, `telex-conformance.txt` không có
+/// một vector backspace nào, nên không có luật cũ nào bị vi phạm; các vector
+/// trong section đó là spec MỚI, và chỉ cho crate này.
 ///
 /// # Vì sao pop tới khi TEXT ĐỔI, không phải pop đúng một phím
 ///
