@@ -11,11 +11,16 @@
 //! # Nguồn sự thật
 //!
 //! `telex-conformance.txt` là spec, không phải `VietDvorak.ahk` và cũng không
-//! phải crate này. 266 vector ở đó chạy qua BA engine: `Transform()` của AHK,
-//! bản mirror JS trong `practice.html`, và crate này qua `vdconform`. Test
-//! trong crate chỉ pin những bất biến mà một vector đơn lẻ không phát biểu
-//! được — chúng không nhân bản spec, vì hai verdict cho một spec sẽ trôi khỏi
-//! nhau.
+//! phải crate này. Vector ở đó chạy qua ba engine — `Transform()` của AHK, bản
+//! mirror JS trong `practice.html`, và crate này qua `vdconform` — nhưng KHÔNG
+//! phải section nào cũng áp dụng cho cả ba. `@section backspace` chỉ dành cho
+//! crate này, vì AHK truncate còn crate này replay, và đó là khác biệt kiến
+//! trúc chứ không phải một bên sai; lý do đầy đủ nằm ở header của file spec và
+//! ở chú thích của [`Session`].
+//!
+//! Test trong crate chỉ pin những bất biến mà một vector đơn lẻ không phát biểu
+//! được — cờ `consumed`, hay "một âm tiết không bao giờ mang hai dấu". Chúng
+//! không nhân bản spec, vì hai verdict cho một spec sẽ trôi khỏi nhau.
 
 #![no_std]
 
@@ -95,19 +100,48 @@ pub struct View {
 
 /// Trạng thái gõ của một ô nhập liệu.
 ///
-/// Cố ý CHƯA có `backspace()`. Bản AHK cắt buffer bằng `SubStr(g_buffer, 1, -1)`
-/// mà không chuẩn hoá lại, phá bất biến "tối đa một dấu, đúng tại target" và
-/// tạo ra được `mùà` (hai dấu). `telex-conformance.txt` có 266 vector và **zero
-/// vector backspace**, nên AHK không thể làm oracle cho hành vi này — không có
-/// đáp án đúng nào để so.
+/// # Backspace là REPLAY, không phải truncate
 ///
-/// Backspace sẽ vào ở pha sau, bằng **replay** chứ không phải truncate: giữ
-/// lịch sử phím thô, pop, chạy lại [`Telex::transform`] từ rỗng. Đó là fix
-/// nguyên nhân gốc, và nó chỉ khả thi dưới preedit — nơi IME sở hữu vùng đang
-/// gõ nên buffer không còn phải mô hình hoá màn hình.
+/// Bản AHK cắt buffer bằng `SubStr(g_buffer, 1, -1)` mà không chuẩn hoá lại.
+/// Nó phải làm thế: trong mô hình injection, `g_buffer` CHÍNH LÀ mô hình của
+/// text mà app sở hữu, nên không có gì khác để cắt. Hệ quả là bất biến "tối đa
+/// một dấu, đúng tại target" bị phá, và `muafn` ⌫ `f` ra `mùà` — hai dấu, một
+/// chuỗi tiếng Việt không biểu đạt được.
+///
+/// Dưới preedit, IME sở hữu vùng đang gõ tuyệt đối, nên [`Session`] không còn
+/// phải mô hình hoá màn hình và giữ được thứ đúng đắn hơn: **lịch sử phím thô**.
+/// Backspace pop lịch sử rồi chạy lại [`Telex::transform`] từ rỗng. Không có
+/// trạng thái nào để hỏng, nên hai dấu là điều KHÔNG THỂ ĐẠT TỚI chứ không phải
+/// điều được canh chừng.
+///
+/// Đây là hành vi MỚI, không phải port: AHK không thể làm oracle cho nó, vì
+/// truncate và replay khác nhau ở gần như mọi input (`tieengs` ⌫ cho `tiến` so
+/// với `tiêng`). `telex-conformance.txt` có 266 vector và zero vector
+/// backspace, nên cũng không có luật cũ nào bị vi phạm.
+///
+/// # Vì sao pop tới khi TEXT ĐỔI, không phải pop đúng một phím
+///
+/// Luật này lấy từ `undoKey()` trong `practice.html`, nơi nó đã được lập luận
+/// đầy đủ. Phím bị NUỐT vẫn phải được ghi log: chữ `w` thừa trong `dduwowngf`
+/// không sinh ra text nào, nhưng nó là một keystroke, và bỏ nó khỏi log sẽ làm
+/// replay sau đó lệch khỏi thứ người dùng thực sự đã gõ. Nhưng nếu Backspace
+/// chỉ pop đúng một phím thì lần bấm ấy sẽ **tỏ ra là không làm gì cả**. Nên:
+/// pop cho tới khi text đổi.
+///
+/// # Khác biệt với `practice.html`, có chủ ý
+///
+/// Log của trainer trải trên CẢ text đã chốt, nên undo bên đó có thể pop một
+/// dấu cách và kéo text đã commit trở lại buffer. Engine này không thể và không
+/// nên: text đã chốt thuộc về app, không thuộc về IME. Khi log rỗng,
+/// [`Session::backspace`] trả `consumed: false` và để app tự xoá text của nó.
 #[derive(Debug, Clone, Default)]
 pub struct Session {
     buf: Vec<char>,
+    /// Chuỗi phím đã TẠO RA `buf`, chỉ của âm tiết đang gõ.
+    ///
+    /// `buf` được suy ra từ đây, không bao giờ ngược lại — đó chính là thứ cho
+    /// phép Backspace undo một KEYSTROKE thay vì một ký tự.
+    keys: Vec<char>,
     telex: Telex,
 }
 
@@ -117,6 +151,7 @@ impl Session {
     pub fn new() -> Self {
         Self {
             buf: Vec::new(),
+            keys: Vec::new(),
             telex: Telex::new(),
         }
     }
@@ -134,7 +169,54 @@ impl Session {
     /// thời điểm đó; IME được OS báo thẳng, nên cả khối ấy thu về một lời gọi.
     pub fn reset(&mut self) {
         self.buf.clear();
+        self.keys.clear();
         self.telex = Telex::new();
+    }
+
+    /// Undo keystroke cuối cùng ĐÃ SINH RA THỨ GÌ ĐÓ, và không undo gì thêm.
+    ///
+    /// Trả `consumed: false` khi engine không còn gì để undo — lúc đó Backspace
+    /// là của app, không phải của IME. Lý do đầy đủ của cả hai luật nằm ở
+    /// chú thích của [`Session`].
+    pub fn backspace(&mut self) -> View {
+        if self.keys.is_empty() {
+            return View {
+                composing: String::new(),
+                committed: String::new(),
+                consumed: false,
+            };
+        }
+        let before = self.composing();
+        while self.keys.pop().is_some() {
+            self.replay();
+            if self.composing() != before {
+                break;
+            }
+        }
+        View {
+            composing: self.composing(),
+            committed: String::new(),
+            consumed: true,
+        }
+    }
+
+    /// Dựng lại `buf` từ `keys`, bắt đầu từ rỗng với máy trạng thái mới.
+    ///
+    /// Đúng theo cấu trúc: [`Telex::transform`] là hàm thuần của
+    /// `(buffer, key)` cộng đúng một bit trạng thái, và bit đó KHÔNG QUAN SÁT
+    /// ĐƯỢC khi buffer rỗng (nó chỉ được đọc trên đường escape cặp, mà đường ấy
+    /// đòi buffer khác rỗng). Nên replay từ rỗng với bit đã xoá tái hiện đúng
+    /// từng trạng thái sống, keystroke cho keystroke.
+    fn replay(&mut self) {
+        let keys = core::mem::take(&mut self.keys);
+        let mut telex = Telex::new();
+        let mut buf = Vec::new();
+        for k in &keys {
+            buf = telex.transform(&buf, *k);
+        }
+        self.keys = keys;
+        self.telex = telex;
+        self.buf = buf;
     }
 
     /// Đưa một ký tự qua đường apply đầy đủ: hỏi luật ngắt âm tiết trước, rồi
@@ -150,6 +232,10 @@ impl Session {
             let mut committed: String = self.buf.iter().collect();
             committed.push(key);
             self.buf.clear();
+            // Text đã chốt thuộc về app, nên log phím KHÔNG được sống qua ranh
+            // giới âm tiết: giữ lại là hứa một phép undo mà engine không có
+            // quyền thực hiện.
+            self.keys.clear();
             // Cờ shortcut `w` mô tả quan hệ giữa hai phím LIỀN NHAU trong cùng
             // một âm tiết. Âm tiết đã chốt thì quan hệ đó không còn nghĩa.
             self.telex = Telex::new();
@@ -159,6 +245,9 @@ impl Session {
                 consumed: true,
             };
         }
+        // Ghi log TRƯỚC, và ghi cả phím bị nuốt: log phải là thứ người dùng gõ,
+        // không phải thứ engine chấp nhận. Xem chú thích của Session.
+        self.keys.push(key);
         self.buf = self.telex.transform(&self.buf, key);
         View {
             composing: self.composing(),
@@ -222,6 +311,90 @@ mod tests {
         let v = s.feed(' ');
         assert!(!v.committed.is_empty());
         assert!(v.composing.is_empty());
+    }
+
+    /// Gõ một chuỗi vào phiên mới; `⌫` nghĩa là Backspace. Trả composing.
+    fn typed(s: &str) -> String {
+        let mut sess = Session::new();
+        for c in s.chars() {
+            if c == '⌫' {
+                sess.backspace();
+            } else {
+                sess.feed(c);
+            }
+        }
+        sess.composing()
+    }
+
+    #[test]
+    fn two_tone_marks_are_unreachable() {
+        // Đây là bug của bản AHK, tái hiện nguyên văn đường đi của nó:
+        // "muafn" cho "muàn", cắt một ký tự cho "muà" (dấu kẹt ở vị trí không
+        // còn là target), rồi "f" áp dấu THỨ HAI -> "mùà".
+        //
+        // Replay không có trạng thái để hỏng, nên chỗ này không cần một guard —
+        // nó cần một test chứng minh guard là thừa.
+        let out = typed("muafn⌫f");
+        assert!(
+            out.chars().filter(|c| "àáảãạùúủũụ".contains(*c)).count() <= 1,
+            "một âm tiết không bao giờ mang hai dấu, ra {out:?}"
+        );
+        assert_ne!(out, "mùà");
+        // ⌫ đưa buffer về đúng trạng thái sau "muaf", tức "mùa" — nên phím "f"
+        // kế tiếp là ESCAPE và gỡ luôn dấu vừa có. Kết quả "muaf" không có dấu
+        // nào, và đó là câu trả lời đúng: replay không để lại trạng thái nào
+        // khiến phím thanh hiểu nhầm là mình đang gõ một dấu mới.
+        assert_eq!(out, typed("muaff"));
+        assert_eq!(out, "muaf");
+    }
+
+    #[test]
+    fn cuarn_is_the_same_defect_and_is_also_unreachable() {
+        assert_ne!(typed("cuarn⌫r"), "củả");
+        assert_eq!(typed("cuarn⌫r"), typed("cuarr"));
+    }
+
+    #[test]
+    fn backspace_undoes_a_keystroke_not_a_character() {
+        // Truncate cho "tiến" (mất chữ t); replay cho "tiêng" (mất dấu, đúng
+        // phím cuối mà người dùng vừa bấm).
+        assert_eq!(typed("tieengs⌫"), "tiêng");
+        assert_eq!(typed("tieengs⌫"), typed("tieeng"));
+    }
+
+    #[test]
+    fn a_swallowed_key_has_nothing_to_undo_so_backspace_skips_past_it() {
+        // Chữ "w" thứ hai trong "dduwow" bị nuốt (vần đã ở đúng dạng có móc).
+        // Nếu Backspace pop đúng một phím, lần bấm ấy sẽ không đổi gì trên màn
+        // hình — người dùng thấy Backspace "hỏng".
+        let swallowed = typed("dduwow");
+        assert_eq!(swallowed, typed("dduwo"), "phím w thứ hai phải bị nuốt");
+        assert_ne!(typed("dduwow⌫"), swallowed, "Backspace phải đổi được text");
+    }
+
+    #[test]
+    fn backspace_on_an_empty_engine_belongs_to_the_app() {
+        let mut s = Session::new();
+        let v = s.backspace();
+        assert!(
+            !v.consumed,
+            "engine không có gì để undo thì không được nuốt phím"
+        );
+        assert_eq!(v.composing, "");
+        assert_eq!(v.committed, "");
+    }
+
+    #[test]
+    fn backspace_never_reaches_back_across_a_commit() {
+        // Text đã chốt thuộc về app. Sau dấu cách, engine không còn gì để undo,
+        // nên phím phải rơi xuống app thay vì kéo "chào" trở lại buffer.
+        let mut s = Session::new();
+        for c in "chaof ".chars() {
+            s.feed(c);
+        }
+        let v = s.backspace();
+        assert!(!v.consumed);
+        assert_eq!(s.composing(), "");
     }
 
     #[test]

@@ -88,7 +88,29 @@ const END_MARKER = '// END TELEX ENGINE';
 const GEN_BEGIN = '// BEGIN GENERATED FROM telex-conformance.txt — do not edit by hand';
 const GEN_END = '// END GENERATED FROM telex-conformance.txt';
 
-const SECTIONS = ['transform', 'integration'];
+const SECTIONS = ['transform', 'integration', 'backspace'];
+
+// Which engines each section is a spec FOR. Stated per section rather than
+// assumed to be "all of them", because the engines do not implement the same set
+// of behaviours — the Rust crate is an IME and owns a preedit, VietDvorak.ahk
+// injects into whoever has focus, and the two genuinely disagree about what
+// Backspace can reach. The full reasoning is in the header of
+// telex-conformance.txt, next to the section it limits; this table only has to
+// AGREE with that prose, not restate it.
+//
+// A section that applied everywhere by default would have to be written to the
+// weakest engine, and the strongest behaviour would then have no spec at all.
+const SECTION_ENGINES = {
+  transform: ['js', 'ahk', 'rust'],
+  integration: ['js', 'ahk', 'rust'],
+  backspace: ['rust'],
+};
+const ENGINES = ['js', 'ahk', 'rust'];
+const applies = (engine, section) => (SECTION_ENGINES[section] || []).includes(engine);
+
+// The Backspace key, as it is written in the vector file. Same glyph the scoring
+// cases already use (KEY_BACKSPACE below), so the notation is one thing.
+const VECTOR_BACKSPACE = '⌫';
 
 function die(msg) {
   console.error(`check-parity: ${msg}`);
@@ -1826,6 +1848,14 @@ function loadVectors() {
     if (section === 'transform' && !/^[A-Za-z]+$/.test(input)) {
       die(`${VECTOR_PATH}:${lineNo}: "${input}" has a non-letter — it belongs in @section integration`);
     }
+    // A syllable-ending character here would commit, and an IME cannot reach
+    // back across a commit — the vector would then be asking the engine for
+    // something it deliberately declines to do, and would fail for a reason
+    // that says nothing about Backspace.
+    if (section === 'backspace' && !new RegExp(`^[A-Za-z${VECTOR_BACKSPACE}]+$`).test(input)) {
+      die(`${VECTOR_PATH}:${lineNo}: "${input}" — @section backspace takes letters and `
+        + `${VECTOR_BACKSPACE} only. A syllable-ending character belongs in @section integration.`);
+    }
     entries.push({ kind: 'vector', section, lineNo, input, expected });
   });
   const vectors = entries.filter(e => e.kind === 'vector');
@@ -3245,25 +3275,45 @@ const wordList = checkWordLists(js);
 const scoring = checkScoring(html, wordList.entries);
 const embeddedStale = html.slice(genRegion.from, genRegion.to) !== block;
 
-// --- run both engines ------------------------------------------------------
-const results = vectors.map(v => {
-  let actual;
-  try {
-    actual = runJsVector(js, v);
-  } catch (err) {
-    actual = `<threw ${err.message}>`;
+// --- run the engines -------------------------------------------------------
+const results = vectors.map(v => ({ vector: v, js: null, ahk: null, rust: null }));
+
+// Vectors an engine is a spec for, and the only ones it is ever handed. An
+// engine is never asked a question its section does not put to it, so a null
+// below always means "did not run", never "ran and had nothing to say".
+const forEngine = (engine) => vectors.filter(v => applies(engine, v.section));
+
+// Results come back positionally, so they are merged back positionally against
+// the same filter that produced the input. The count check is what makes that
+// safe: it turns a protocol slip into one loud sentence instead of a whole
+// column of mismatches attributed to the wrong vectors.
+function mergeInto(engine, actuals) {
+  const want = forEngine(engine).length;
+  if (actuals.length !== want) {
+    die(`${engine} returned ${actuals.length} results for ${want} applicable vector(s)`);
   }
-  return { vector: v, js: actual, ahk: null, rust: null };
-});
+  let k = 0;
+  for (const r of results) {
+    if (applies(engine, r.vector.section)) r[engine] = actuals[k++];
+  }
+}
+
+mergeInto('js', forEngine('js').map(v => {
+  try {
+    return runJsVector(js, v);
+  } catch (err) {
+    return `<threw ${err.message}>`;
+  }
+}));
 
 const found = skipAhk ? { exe: null, tried: [], note: '--skip-ahk' } : findAutoHotkey();
 let ahkRan = false;
 let ahkNotes = [];
 if (found.exe) {
   const ahkSrc = read(AHK_PATH, 'input method');
-  const out = runAhkVectors(found.exe, ahkSrc, vectors, js);
+  const out = runAhkVectors(found.exe, ahkSrc, forEngine('ahk'), js);
   if (out.error) die(out.error);
-  results.forEach((r, i) => { r.ahk = out.actuals[i]; });
+  mergeInto('ahk', out.actuals);
   ahkNotes = out.notes;
   ahkRan = true;
 } else {
@@ -3274,7 +3324,7 @@ let rustRan = false;
 if (skipRust) {
   loudSkipRust('by --skip-rust', true);
 } else {
-  const out = runRustVectors(vectors);
+  const out = runRustVectors(forEngine('rust'));
   if (out.missing) {
     loudSkipRust('cargo not found', false);
   } else if (out.error) {
@@ -3283,34 +3333,55 @@ if (skipRust) {
     // said to agree with anything.
     die(out.error);
   } else {
-    results.forEach((r, i) => { r.rust = out.actuals[i]; });
+    mergeInto('rust', out.actuals);
     rustRan = true;
   }
 }
+const ran = { js: true, ahk: ahkRan, rust: rustRan };
 
 // --- report ----------------------------------------------------------------
+// An engine is judged ONLY on the vectors its sections put to it. Counting a
+// section it is not a spec for would make @section backspace look like 15 AHK
+// failures, which is exactly backwards: the AHK is not failing there, it is not
+// being asked.
+const checked = (engine) => (ran[engine] ? forEngine(engine).length : 0);
+const scored = (engine) => results.filter(r => ran[engine] && applies(engine, r.vector.section));
+
 const failures = [];
 for (const r of results) {
-  if (r.js !== r.vector.expected) failures.push({ ...r.vector, engine: 'JS  ', actual: r.js });
-  if (ahkRan && r.ahk !== r.vector.expected) failures.push({ ...r.vector, engine: 'AHK ', actual: r.ahk });
-  if (rustRan && r.rust !== r.vector.expected) failures.push({ ...r.vector, engine: 'RUST', actual: r.rust });
+  for (const e of ENGINES) {
+    if (!ran[e] || !applies(e, r.vector.section)) continue;
+    if (r[e] !== r.vector.expected) {
+      failures.push({ ...r.vector, engine: e.toUpperCase().padEnd(4), actual: r[e] });
+    }
+  }
 }
-const jsPass = results.filter(r => r.js === r.vector.expected).length;
-const ahkPass = results.filter(r => r.ahk === r.vector.expected).length;
-const rustPass = results.filter(r => r.rust === r.vector.expected).length;
+const jsPass = scored('js').filter(r => r.js === r.vector.expected).length;
+const ahkPass = scored('ahk').filter(r => r.ahk === r.vector.expected).length;
+const rustPass = scored('rust').filter(r => r.rust === r.vector.expected).length;
 
 // Drift is engine-vs-engine, independent of the spec: two engines can both be
 // wrong the same way (that is a spec bug) or wrong in different ways (that is
-// drift). With three arms the pairs have to be named, because "which two
-// disagree" is the first question a maintainer asks.
-const engineCount = 1 + (ahkRan ? 1 : 0) + (rustRan ? 1 : 0);
-const drift = results.flatMap((r) => {
-  const pairs = [];
-  if (ahkRan && r.js !== r.ahk) pairs.push({ vector: r.vector, a: 'JS', av: r.js, b: 'AHK', bv: r.ahk });
-  if (rustRan && r.js !== r.rust) pairs.push({ vector: r.vector, a: 'JS', av: r.js, b: 'RUST', bv: r.rust });
-  if (ahkRan && rustRan && r.ahk !== r.rust) pairs.push({ vector: r.vector, a: 'AHK', av: r.ahk, b: 'RUST', bv: r.rust });
-  return pairs;
-});
+// drift). Only pairs where BOTH engines are a spec for the section — comparing
+// an answer against an engine that was never asked is not drift, it is a
+// category error.
+const passOf = { js: jsPass, ahk: ahkPass, rust: rustPass };
+
+// One tally, built from the counts the checks produced, used by every verdict
+// below. Each engine carries its OWN denominator — they are not all answering
+// the same number of questions any more, and printing a shared one would be a
+// quiet lie about coverage.
+const tally = ENGINES
+  .map(e => (ran[e] ? `${e.toUpperCase()} ${passOf[e]}/${checked(e)}` : `${e.toUpperCase()} UNVERIFIED`))
+  .join(', ');
+
+const PAIRS = [['js', 'ahk'], ['js', 'rust'], ['ahk', 'rust']];
+const engineCount = ENGINES.filter(e => ran[e]).length;
+const drift = results.flatMap(r => PAIRS
+  .filter(([a, b]) => ran[a] && ran[b]
+    && applies(a, r.vector.section) && applies(b, r.vector.section)
+    && r[a] !== r[b])
+  .map(([a, b]) => ({ vector: r.vector, a: a.toUpperCase(), av: r[a], b: b.toUpperCase(), bv: r[b] })));
 const wordListBroken = wordList.failures.length > 0;
 const scoringBroken = scoring.failures.length > 0;
 const allGood = failures.length === 0 && !embeddedStale && !wordListBroken && !scoringBroken;
@@ -3334,9 +3405,18 @@ function scoringLines(indent) {
 }
 
 if (allGood && ahkRan && rustRan) {
-  console.log(`PASS  ${vectors.length}/${vectors.length} vectors — all three engines`);
+  console.log(`PASS  ${vectors.length} vectors — all three engines: ${tally}`);
   console.log(`      practice.html engine + VietDvorak.ahk Transform() + vietdvorak-core`);
   console.log(`      all match ${VECTOR_PATH}`);
+  // Denominators differ on purpose; say so once here rather than let a reader
+  // wonder whether a smaller number means something was skipped.
+  for (const s of SECTIONS) {
+    const only = SECTION_ENGINES[s];
+    if (only.length < ENGINES.length) {
+      const n = vectors.filter(v => v.section === s).length;
+      console.log(`      @section ${s}: ${n} vector(s), ${only.join(' + ')} only — by spec, see the file header`);
+    }
+  }
   console.log(`      AutoHotkey: ${found.exe}`);
   console.log('      embedded self-test vectors are in sync');
   for (const l of scoringLines('      ')) console.log(l);
@@ -3348,10 +3428,9 @@ if (allGood && ahkRan && rustRan) {
 if (allGood) {
   // Every vector that RAN agrees with the spec, but at least one engine did not
   // run. Name which, and keep the exit non-zero — see loudSkip() and the header.
-  const unverified = [!ahkRan && 'AHK', !rustRan && 'Rust'].filter(Boolean).join(' + ');
-  console.log(`PARTIAL  ${jsPass}/${vectors.length} vectors — ${unverified} side UNVERIFIED`);
+  const unverified = ENGINES.filter(e => !ran[e]).map(e => e.toUpperCase()).join(' + ');
+  console.log(`PARTIAL  ${unverified} side UNVERIFIED — ${tally}`);
   console.log(`         ${engineCount} of 3 engines ran and match ${VECTOR_PATH}`);
-  if (rustRan) console.log(`         vietdvorak-core: ${rustPass}/${vectors.length}`);
   console.log('         embedded self-test vectors are in sync');
   for (const l of scoringLines('         ')) console.log(l);
   if (!ahkRan) {
@@ -3424,10 +3503,6 @@ if (embeddedStale) {
 
 // Nothing left to tabulate: the vectors themselves are all green and what failed
 // was one of the guards above.
-const tally = `JS ${jsPass}/${vectors.length}`
-  + (ahkRan ? `, AHK ${ahkPass}/${vectors.length}` : ', AHK UNVERIFIED')
-  + (rustRan ? `, RUST ${rustPass}/${vectors.length}` : ', RUST UNVERIFIED');
-
 if (failures.length === 0) {
   console.error(`      (the engines themselves pass: ${tally})`);
   process.exit(1);

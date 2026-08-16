@@ -25,6 +25,9 @@
 //! - `integration` — `input` có thể chứa ký tự BẤT KỲ. Từng ký tự qua đường
 //!   apply (hỏi luật ngắt âm tiết trước, rồi mới `transform()`); kết quả là
 //!   committed + buffer sau ký tự cuối.
+//! - `backspace` — như `transform` nhưng `input` còn có thể chứa `⌫` nghĩa là
+//!   Backspace. Rust-only: AHK truncate còn engine này replay, hai thứ khác
+//!   nhau ở gần như mọi input, nên không có oracle nào để so.
 //!
 //! Lỗi giao thức (section lạ, thiếu TAB) là lỗi CỦA HARNESS, không phải bất
 //! đồng của engine — nên nó ra stderr và exit khác 0, chứ không lặng lẽ thành
@@ -51,6 +54,28 @@ fn run_transform(input: &str) -> String {
     buf.into_iter().collect()
 }
 
+/// Ký tự đại diện cho phím Backspace trong file vector.
+///
+/// Cùng ký tự mà `check-parity.mjs` đã dùng cho tầng scoring (`KEY_BACKSPACE`),
+/// nên notation là một chứ không phải hai.
+const BACKSPACE: char = '⌫';
+
+/// Chạy `input` như `transform`, nhưng `⌫` là phím Backspace.
+///
+/// Section này không cho phép ký tự ngắt âm tiết (parser bên `check-parity.mjs`
+/// từ chối chúng), nên không có gì được chốt và kết quả chính là composing.
+fn run_backspace(input: &str) -> String {
+    let mut session = Session::new();
+    for key in input.chars() {
+        if key == BACKSPACE {
+            session.backspace();
+        } else {
+            session.feed(key);
+        }
+    }
+    session.composing()
+}
+
 /// Chạy `input` qua đường apply đầy đủ; kết quả là committed + buffer.
 fn run_integration(input: &str) -> String {
     let mut session = Session::new();
@@ -72,6 +97,12 @@ fn main() -> ExitCode {
 
     let stdout = io::stdout();
     let mut out = BufWriter::new(stdout.lock());
+
+    // Nuốt BOM đầu vào nếu có. Không phải chuyện lý thuyết: một pipeline
+    // PowerShell sẽ thêm nó, và không có dòng này thì lỗi hiện ra dưới dạng
+    // "section lạ \u{feff}transform" — một thông báo tố cáo sai chỗ và tốn cả
+    // buổi để lần ra.
+    let src = src.strip_prefix('\u{feff}').unwrap_or(&src).to_owned();
 
     // Bỏ dòng rỗng cuối do trailing newline, KHÔNG bỏ dòng rỗng ở giữa: một
     // dòng rỗng giữa chừng nghĩa là harness gửi sai số lượng vector, và bên kia
@@ -96,11 +127,12 @@ fn main() -> ExitCode {
         let result = match section {
             "transform" => run_transform(input),
             "integration" => run_integration(input),
+            "backspace" => run_backspace(input),
             other => {
                 let _ = writeln!(
                     io::stderr(),
                     "vdconform: dòng {} có section lạ {other:?} — \
-                     lõi này chỉ biết \"transform\" và \"integration\"",
+                     lõi này chỉ biết \"transform\", \"integration\" và \"backspace\"",
                     n.saturating_add(1)
                 );
                 return ExitCode::FAILURE;

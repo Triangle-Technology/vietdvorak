@@ -2,15 +2,24 @@
 # Telex engine (VietDvorak.ahk :: Transform()).
 #
 # ROLE: this file is the SINGLE SOURCE OF TRUTH for Telex behaviour. The AHK
-# input method and the practice.html trainer must both agree with it; when they
-# disagree, THIS FILE IS RIGHT and the implementation is wrong. Any change to
-# the engine's observable behaviour must land here in the same commit.
-# `node check-parity.mjs` runs every vector below through BOTH engines.
+# input method, the practice.html trainer and the Rust crate must all agree with
+# it; when they disagree, THIS FILE IS RIGHT and the implementation is wrong.
+# Any change to the engine's observable behaviour must land here in the same
+# commit. `node check-parity.mjs` runs every vector below through every engine
+# that section applies to.
+#
+# NOT EVERY SECTION APPLIES TO EVERY ENGINE, and that is stated per section
+# rather than assumed. The engines do not implement the same set of behaviours:
+# the Rust crate is an IME and owns a preedit, the AHK script injects text into
+# whatever window has focus, and those two models genuinely differ about what
+# Backspace can reach. A section that ran everywhere by default would have to be
+# written to the weakest engine, and the strongest behaviour would then have no
+# spec at all. Where a section is limited, the line that limits it says WHY.
 #
 # FORMAT: one case per line, `input<TAB>expected`. Lines starting with # are
 # comments; blank lines are ignored. A line `@section <name>` opens a section
 # and says HOW the following inputs are fed to the engine — every vector must
-# sit under one, and the two sections are not interchangeable:
+# sit under one, and the sections are not interchangeable:
 #
 #   @section transform
 #       `input` is a sequence of LETTER keystrokes typed into an EMPTY buffer.
@@ -48,6 +57,53 @@
 #       hook, so nothing can execute it under test — its loop bound and hotkey
 #       flags are checked as TEXT by check-parity.mjs (assertRegistration) and its
 #       control flow is not checked at all.
+#
+#   @section backspace          ENGINES: rust only
+#       `input` is LETTER keystrokes typed into an EMPTY buffer, as in @section
+#       transform, except it may also contain `⌫`, which means the Backspace
+#       key. `expected` is the buffer after the last key. A syllable-ending
+#       character may NOT appear here (see the engine note below).
+#
+#       WHY RUST ONLY, and why this is not a gap being tolerated:
+#
+#       Backspace is the one behaviour where the three implementations are not
+#       three versions of one function. They are three different functions, and
+#       the difference is architectural rather than accidental:
+#
+#         VietDvorak.ahk truncates. It has to: under injection, g_buffer IS the
+#           model of the text the focused window owns, so there is nothing else
+#           to cut. That breaks the "at most one tone, sitting exactly at
+#           FindToneTarget" invariant that the tone-key path relies on, and
+#           "muafn" + Backspace + "f" produces "mùà" — two tone marks, which is
+#           not an expressible Vietnamese syllable. This is a real defect in the
+#           shipped script, not a modelling choice.
+#         practice.html replays a keystroke log, which is correct, but its log
+#           spans committed text as well, so its undo can pop a space and pull
+#           already-committed text back into the buffer.
+#         The Rust crate replays a keystroke log too, but only within the
+#           current syllable, because an IME owns the preedit and nothing more.
+#           Committed text belongs to the application. When its log is empty it
+#           declines the key and lets the application delete its own text.
+#
+#       So AHK cannot be an oracle here — truncate and replay disagree on almost
+#       every input ("tieengs" + Backspace is "tiến" one way and "tiêng" the
+#       other) and there is no answer to compare against. practice.html agrees
+#       with the Rust crate only where a vector stays inside one syllable, which
+#       is why syllable-ending characters are refused above: a section whose
+#       meaning was "the subset where two different models happen to coincide"
+#       would be a weaker thing to own than a section that states what the IME
+#       engine does.
+#
+#       Nothing here contradicts an older rule, because there was no older rule:
+#       before this section the file had 266 vectors and not one of them pressed
+#       Backspace. That is also why the defect above went eight rounds of code
+#       review without being caught.
+#
+#       practice.html's undoKey() carries the full reasoning for the replay rule
+#       itself, including the part that is easy to get wrong: a SWALLOWED key is
+#       still logged (the redundant "w" of "dduwowngf" produces no text but is a
+#       keystroke), so undo pops keys until the TEXT changes. Popping exactly one
+#       key would let a Backspace appear to do nothing.
 #
 # NOTE on tone placement: generated with TONE_PLACEMENT_MODERN := true, i.e.
 # hoà / khoẻ / thuỷ. Flipping that constant in VietDvorak.ahk changes exactly
@@ -411,3 +467,36 @@ ddaij.	đại.
 DDaij.	Đại.
 xin TIEENGS	xin TIẾNG
 UW UW	Ư Ư
+
+@section backspace
+
+# --- Replay, not truncate. Under truncation "tieengs" would leave "tiến": the
+# --- "t" the typist never touched goes, and the tone they meant to take back
+# --- stays. Replay takes back exactly the key that was pressed.
+tieengs⌫	tiêng
+tieengs⌫⌫	tiên
+Vieetj⌫	Viêt
+dduwowngf⌫	đương
+luuwj⌫	lưu
+nguwoif⌫	ngươi
+
+# --- The AHK defect is UNREACHABLE here, and these are its own inputs. Replay
+# --- rebuilds from the key log, so there is no half-updated buffer for the next
+# --- tone key to misread, and no guard is needed to say so.
+muafn⌫f	muaf
+cuarn⌫r	cuar
+
+# --- A swallowed key has nothing to undo, so Backspace pops PAST it. The second
+# --- "w" of "dduwow" produces no text (the nucleus is already ươ); popping only
+# --- it would leave the screen unchanged and the key would look broken.
+dduwow⌫	đư
+
+# --- Undoing an escape puts back what the escape took away.
+aaa⌫	â
+ass⌫	á
+oww⌫	ơ
+ww⌫	ư
+
+# --- Undoing a diacritic pair leaves its first key, not nothing.
+dd⌫	d
+uw⌫	u
