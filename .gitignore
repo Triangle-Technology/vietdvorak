@@ -1,1 +1,6 @@
 proton_recovery.asc
+
+# Rust build output. Cargo.lock KHÔNG nằm đây: workspace này ship binary, và
+# một binary đọc mọi phím người dùng gõ phải build lại được bit-for-bit từ
+# nguồn — lockfile là một nửa của lời hứa đó.
+/target

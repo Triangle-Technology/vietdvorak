@@ -1,0 +1,14 @@
+[package]
+name = "vietdvorak-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Telex + Dvorak engine for Vietnamese Dvorak Keyboard — pure logic, no OS"
+
+# KHÔNG có [dependencies], và đó là một quyết định BẢO MẬT, không phải thẩm mỹ.
+# Mọi crate trên đường đi của phím đọc được mọi thứ người dùng gõ. Giữ con số ở 0
+# là claim kiểm chứng được bằng `cargo tree`, khác hẳn một dòng trong README.
+
+[lints]
+workspace = true

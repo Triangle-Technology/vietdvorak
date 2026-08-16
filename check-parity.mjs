@@ -33,9 +33,10 @@
 //     reader), so "the readout says 0% and every character on screen is green"
 //     is a failure here rather than a thing only a human ever notices.
 //
-//     node check-parity.mjs                  check both engines + embedded vectors
+//     node check-parity.mjs                  check all engines + embedded vectors
 //     node check-parity.mjs --sync-selftests regenerate the embedded vector block
-//     node check-parity.mjs --skip-ahk       JS only; PARTIAL, and STILL exits 1
+//     node check-parity.mjs --skip-ahk       skip AHK;  PARTIAL, and STILL exits 1
+//     node check-parity.mjs --skip-rust      skip Rust; PARTIAL, and STILL exits 1
 //
 // --skip-ahk does not buy a green exit, deliberately: the exit code is the only
 // thing CI reads, and a JS-only run has not executed the shipped input method at
@@ -43,6 +44,16 @@
 // verdict without the AutoHotkey search and its wall of paths — that is what the
 // flag is for. A pipeline that genuinely wants to proceed anyway has to write
 // `|| true` at the call site, where the decision is visible in the diff.
+//
+// A THIRD ENGINE, as of the Rust port: crates/vietdvorak-core, driven through
+// the vdconform binary over the same section<TAB>input protocol the AHK harness
+// already uses. It is deliberately NOT a `cargo test` that reads this spec for
+// itself — that would be a second parser and a second verdict for one spec, and
+// the two would drift. vdconform computes and prints; this file alone judges.
+// One harness, one exit code, three engines.
+//
+// --skip-rust carries exactly the same terms as --skip-ahk, for the same reason.
+// It exists for the machine that has no Rust toolchain, not for a red run.
 //
 // No dependencies, no network, no arguments needed. Node 14+.
 //
@@ -61,7 +72,7 @@
 // ============================================================================
 
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, unlinkSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, delimiter } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -3103,7 +3114,69 @@ function runAhkVectors(exe, ahkSrc, vectors, js) {
   return { actuals: lines, notes };
 }
 
+// ---------------------------------------------------------------------------
+// The Rust arm — crates/vietdvorak-core, through the vdconform binary
+// ---------------------------------------------------------------------------
+// Same protocol as the AHK harness above: section<TAB>input in, one result line
+// out per vector, in order. vdconform never sees `expected` and never decides
+// anything — see the note in the header about why the verdict stays here.
+//
+// It is run through `cargo run`, not through a path to a prebuilt exe, ON
+// PURPOSE. This script is a drift alarm; an alarm that can be satisfied by a
+// stale binary is worse than no alarm, because it is green for the wrong
+// reason. cargo rebuilds when the sources moved, so what answers here is always
+// what is checked in.
+const CARGO_MANIFEST = join(HERE, 'Cargo.toml');
+
+function runRustVectors(vectors) {
+  const input = vectors.map(v => `${v.section}\t${v.input}`).join('\n') + '\n';
+  const res = spawnSync(
+    'cargo',
+    ['run', '--quiet', '--release', '--manifest-path', CARGO_MANIFEST, '-p', 'vdconform'],
+    { input, encoding: 'utf8', maxBuffer: 64 << 20 },
+  );
+
+  if (res.error) {
+    // ENOENT here means no cargo on PATH, which is a MISSING TOOLCHAIN, not a
+    // failing engine. Reported as a skip by the caller, never as a mismatch.
+    return { missing: res.error.code === 'ENOENT', error: `cargo could not be run: ${res.error.message}` };
+  }
+  // A compile error arrives as a non-zero exit with an empty stdout. Hand back
+  // cargo's own diagnostics verbatim — rustc says it better than a summary can.
+  if (res.status !== 0) {
+    const detail = (res.stderr || '').trimEnd();
+    return { error: `vdconform exited ${res.status}\n${detail || '            (no diagnostics on stderr)'}` };
+  }
+
+  const raw = (res.stdout || '').replace(/^﻿/, '');
+  const lines = raw.split(/\r?\n/);
+  if (lines.length && lines[lines.length - 1] === '') lines.pop();
+  if (lines.length !== vectors.length) {
+    return {
+      error: `vdconform returned ${lines.length} results for ${vectors.length} vectors`
+        + '\n            — the protocol is one line out per line in, in order.',
+    };
+  }
+  return { actuals: lines };
+}
+
 const SKIP_BANNER_RULE = '='.repeat(78);
+
+function loudSkipRust(reason, explicit) {
+  console.error(SKIP_BANNER_RULE);
+  console.error(`  SKIPPED (${reason}) — Rust side UNVERIFIED`);
+  console.error('');
+  console.error('  crates/vietdvorak-core — the engine being ported, and the whole reason');
+  console.error('  a third arm exists — was NOT executed. This run says nothing about it.');
+  if (!explicit) {
+    console.error('');
+    console.error('  cargo was not found on PATH. Install Rust (https://rustup.rs) or pass');
+    console.error('  --skip-rust to acknowledge the gap deliberately.');
+  }
+  console.error('');
+  console.error('  Exiting non-zero: a run that skipped an engine is PARTIAL, never PASS.');
+  console.error(SKIP_BANNER_RULE);
+}
 
 function loudSkip(reason, tried, explicit) {
   console.error(SKIP_BANNER_RULE);
@@ -3141,7 +3214,8 @@ function loudSkip(reason, tried, explicit) {
 const argv = process.argv.slice(2);
 const syncMode = argv.includes('--sync-selftests');
 const skipAhk = argv.includes('--skip-ahk');
-const unknown = argv.filter(a => !['--sync-selftests', '--skip-ahk'].includes(a));
+const skipRust = argv.includes('--skip-rust');
+const unknown = argv.filter(a => !['--sync-selftests', '--skip-ahk', '--skip-rust'].includes(a));
 if (unknown.length) die(`unknown option(s): ${unknown.join(' ')}`);
 
 const html = read(HTML_PATH, 'trainer');
@@ -3179,7 +3253,7 @@ const results = vectors.map(v => {
   } catch (err) {
     actual = `<threw ${err.message}>`;
   }
-  return { vector: v, js: actual, ahk: null };
+  return { vector: v, js: actual, ahk: null, rust: null };
 });
 
 const found = skipAhk ? { exe: null, tried: [], note: '--skip-ahk' } : findAutoHotkey();
@@ -3196,15 +3270,47 @@ if (found.exe) {
   loudSkip(skipAhk ? 'by --skip-ahk' : found.note, found.tried, skipAhk);
 }
 
+let rustRan = false;
+if (skipRust) {
+  loudSkipRust('by --skip-rust', true);
+} else {
+  const out = runRustVectors(vectors);
+  if (out.missing) {
+    loudSkipRust('cargo not found', false);
+  } else if (out.error) {
+    // A toolchain that IS present and fails is a real failure, not a skip: it
+    // means the port does not build, and a build that does not build cannot be
+    // said to agree with anything.
+    die(out.error);
+  } else {
+    results.forEach((r, i) => { r.rust = out.actuals[i]; });
+    rustRan = true;
+  }
+}
+
 // --- report ----------------------------------------------------------------
 const failures = [];
 for (const r of results) {
-  if (r.js !== r.vector.expected) failures.push({ ...r.vector, engine: 'JS ', actual: r.js });
-  if (ahkRan && r.ahk !== r.vector.expected) failures.push({ ...r.vector, engine: 'AHK', actual: r.ahk });
+  if (r.js !== r.vector.expected) failures.push({ ...r.vector, engine: 'JS  ', actual: r.js });
+  if (ahkRan && r.ahk !== r.vector.expected) failures.push({ ...r.vector, engine: 'AHK ', actual: r.ahk });
+  if (rustRan && r.rust !== r.vector.expected) failures.push({ ...r.vector, engine: 'RUST', actual: r.rust });
 }
 const jsPass = results.filter(r => r.js === r.vector.expected).length;
 const ahkPass = results.filter(r => r.ahk === r.vector.expected).length;
-const drift = ahkRan ? results.filter(r => r.js !== r.ahk) : [];
+const rustPass = results.filter(r => r.rust === r.vector.expected).length;
+
+// Drift is engine-vs-engine, independent of the spec: two engines can both be
+// wrong the same way (that is a spec bug) or wrong in different ways (that is
+// drift). With three arms the pairs have to be named, because "which two
+// disagree" is the first question a maintainer asks.
+const engineCount = 1 + (ahkRan ? 1 : 0) + (rustRan ? 1 : 0);
+const drift = results.flatMap((r) => {
+  const pairs = [];
+  if (ahkRan && r.js !== r.ahk) pairs.push({ vector: r.vector, a: 'JS', av: r.js, b: 'AHK', bv: r.ahk });
+  if (rustRan && r.js !== r.rust) pairs.push({ vector: r.vector, a: 'JS', av: r.js, b: 'RUST', bv: r.rust });
+  if (ahkRan && rustRan && r.ahk !== r.rust) pairs.push({ vector: r.vector, a: 'AHK', av: r.ahk, b: 'RUST', bv: r.rust });
+  return pairs;
+});
 const wordListBroken = wordList.failures.length > 0;
 const scoringBroken = scoring.failures.length > 0;
 const allGood = failures.length === 0 && !embeddedStale && !wordListBroken && !scoringBroken;
@@ -3227,9 +3333,10 @@ function scoringLines(indent) {
   ];
 }
 
-if (allGood && ahkRan) {
-  console.log(`PASS  ${vectors.length}/${vectors.length} vectors — both engines`);
-  console.log(`      practice.html engine + VietDvorak.ahk Transform() match ${VECTOR_PATH}`);
+if (allGood && ahkRan && rustRan) {
+  console.log(`PASS  ${vectors.length}/${vectors.length} vectors — all three engines`);
+  console.log(`      practice.html engine + VietDvorak.ahk Transform() + vietdvorak-core`);
+  console.log(`      all match ${VECTOR_PATH}`);
   console.log(`      AutoHotkey: ${found.exe}`);
   console.log('      embedded self-test vectors are in sync');
   for (const l of scoringLines('      ')) console.log(l);
@@ -3238,16 +3345,20 @@ if (allGood && ahkRan) {
   process.exit(0);
 }
 
-if (allGood && !ahkRan) {
-  console.log(`PARTIAL  ${jsPass}/${vectors.length} vectors — JS ONLY, AHK side UNVERIFIED`);
-  console.log(`         practice.html engine matches ${VECTOR_PATH}`);
+if (allGood) {
+  // Every vector that RAN agrees with the spec, but at least one engine did not
+  // run. Name which, and keep the exit non-zero — see loudSkip() and the header.
+  const unverified = [!ahkRan && 'AHK', !rustRan && 'Rust'].filter(Boolean).join(' + ');
+  console.log(`PARTIAL  ${jsPass}/${vectors.length} vectors — ${unverified} side UNVERIFIED`);
+  console.log(`         ${engineCount} of 3 engines ran and match ${VECTOR_PATH}`);
+  if (rustRan) console.log(`         vietdvorak-core: ${rustPass}/${vectors.length}`);
   console.log('         embedded self-test vectors are in sync');
   for (const l of scoringLines('         ')) console.log(l);
-  console.log('         the syllable-break rule was NOT checked either: it lives in');
-  console.log('         VietDvorak.ahk and is swept by running it.');
+  if (!ahkRan) {
+    console.log('         the syllable-break rule was NOT checked either: it lives in');
+    console.log('         VietDvorak.ahk and is swept by running it.');
+  }
   for (const n of harnessNotes) console.log(`         NOTE  ${n}`);
-  // Never 0. PARTIAL is not PASS, and the exit code has to say the same thing
-  // the word does — see loudSkip() and the header.
   process.exit(1);
 }
 
@@ -3313,15 +3424,16 @@ if (embeddedStale) {
 
 // Nothing left to tabulate: the vectors themselves are all green and what failed
 // was one of the guards above.
+const tally = `JS ${jsPass}/${vectors.length}`
+  + (ahkRan ? `, AHK ${ahkPass}/${vectors.length}` : ', AHK UNVERIFIED')
+  + (rustRan ? `, RUST ${rustPass}/${vectors.length}` : ', RUST UNVERIFIED');
+
 if (failures.length === 0) {
-  console.error(`      (the engines themselves pass: JS ${jsPass}/${vectors.length}`
-    + `${ahkRan ? `, AHK ${ahkPass}/${vectors.length}` : ', AHK UNVERIFIED'})`);
+  console.error(`      (the engines themselves pass: ${tally})`);
   process.exit(1);
 }
 
-console.error(`FAIL  JS ${jsPass}/${vectors.length}`
-  + (ahkRan ? `, AHK ${ahkPass}/${vectors.length}` : ', AHK UNVERIFIED')
-  + ` — ${failures.length} mismatch(es)\n`);
+console.error(`FAIL  ${tally} — ${failures.length} mismatch(es)\n`);
 const wIn = Math.max(...failures.map(f => f.input.length), 5);
 const wSec = Math.max(...failures.map(f => f.section.length), 7);
 const wExp = Math.max(...failures.map(f => f.expected.length), 8);
@@ -3338,14 +3450,21 @@ for (const f of failures) {
 }
 
 if (drift.length) {
-  console.error(`\n  The two engines also disagree with EACH OTHER on ${drift.length} input(s):`);
+  console.error(`\n  The engines also disagree with EACH OTHER on ${drift.length} pair(s):`);
   for (const d of drift.slice(0, 10)) {
-    console.error(`    ${d.vector.input.padEnd(wIn)}  JS ${JSON.stringify(d.js)}  vs  AHK ${JSON.stringify(d.ahk)}`);
+    console.error(`    ${d.vector.input.padEnd(wIn)}  ${d.a} ${JSON.stringify(d.av)}  vs  ${d.b} ${JSON.stringify(d.bv)}`);
   }
   if (drift.length > 10) console.error(`    ... and ${drift.length - 10} more`);
   console.error('  That is real drift: whatever the spec says, one of them is already wrong.');
+  if (rustRan && rustPass < vectors.length) {
+    console.error('');
+    console.error('  While the Rust port is in progress, RUST rows are EXPECTED to be red and');
+    console.error('  are not drift in the usual sense — they are the port not being finished.');
+    console.error('  What matters is that the JS/AHK pair stays green: if that pair goes red,');
+    console.error('  something broke in the shipped engines and the port is not the cause.');
+  }
 }
 
 console.error(`\n  ${VECTOR_PATH} is the spec. If the new behaviour is intended,`);
-console.error('  change the spec and BOTH engines in the same commit.');
+console.error('  change the spec and EVERY engine in the same commit.');
 process.exit(1);

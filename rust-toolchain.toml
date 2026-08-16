@@ -1,0 +1,14 @@
+[toolchain]
+channel = "1.95"
+components = ["clippy", "rustfmt"]
+# Gate compile cho Linux, chạy được TỪ Windows:
+#     cargo check --target x86_64-unknown-linux-musl
+# CHECK chứ không phải BUILD, và đó là quyết định chứ không phải hạn chế. `build`
+# cần một linker cho ELF, tức phải trỏ .cargo/config.toml vào rust-lld bằng
+# đường dẫn tuyệt đối chứa cả tên user lẫn tên toolchain — hỏng ngay khi đổi máy
+# hoặc lên phiên bản. `check` không link nên không cần gì cả.
+#
+# Gate này chỉ trả lời đúng một câu: crate còn compile cho Linux không. Binary
+# thật sẽ build NGAY TRÊN Ubuntu khi có máy — không có nhu cầu nào cần một ELF
+# sinh ra từ Windows, nên không dựng máy móc cho nó.
+targets = ["x86_64-unknown-linux-musl"]

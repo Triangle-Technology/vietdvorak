@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = ["crates/vietdvorak-core", "crates/vdconform"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+
+# Bật cho TOÀN workspace, không rải #![deny] từng crate: một crate mới quên dòng
+# đó là một crate không được canh. Hook path và FSM Telex không được phép panic —
+# trên Linux một panic trong engine làm ibus-daemon respawn và mất preedit; trên
+# Windows nó làm hệ thống âm thầm gỡ hook và bàn phím về QWERTY thô, không báo gì.
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+arithmetic_side_effects = "warn"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

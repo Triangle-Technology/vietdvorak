@@ -1,0 +1,17 @@
+[package]
+name = "vdconform"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Line-protocol runner: makes vietdvorak-core the third engine in check-parity.mjs"
+
+[[bin]]
+name = "vdconform"
+path = "src/main.rs"
+
+[dependencies]
+vietdvorak-core = { path = "../vietdvorak-core" }
+
+[lints]
+workspace = true
