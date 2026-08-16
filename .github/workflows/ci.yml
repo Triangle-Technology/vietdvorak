@@ -115,6 +115,11 @@ jobs:
             if ($LASTEXITCODE -eq 0) { throw "$flag exited 0 — half a check is not a pass" }
             Write-Host "$flag exited $LASTEXITCODE, as it must"
           }
+          # Bước này CỐ Ý kết thúc bằng một lệnh thất bại, mà shell pwsh của
+          # GitHub Actions đóng step bằng `exit $LASTEXITCODE` — nên không có dòng
+          # này thì step thừa hưởng đúng cái exit code nó vừa khẳng định là phải
+          # khác 0, và một bước ĐANG ĐÚNG lại làm build đỏ.
+          exit 0
 
       # Bước "Install AutoHotkey v2" ở trên là thứ duy nhất đứng giữa job này và
       # một lần chạy chỉ có hai engine. Nếu nó hỏng — URL đổi, asset đổi tên,
@@ -132,6 +137,7 @@ jobs:
           node check-parity.mjs | Out-Null
           if ($LASTEXITCODE -eq 0) { throw "missing AutoHotkey exited 0 — a broken install must be red" }
           Write-Host "missing AutoHotkey exited $LASTEXITCODE, as it must"
+          exit 0   # xem chú thích ở bước trên
 
   linux-gate:
     # Lõi còn compile cho Linux không. `check` chứ không phải `build`: xem lý do
