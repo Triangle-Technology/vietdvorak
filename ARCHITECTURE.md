@@ -2,6 +2,9 @@
 
 Hệ thống **là gì**, file **ở đâu**, và cái gì **chưa được kiểm trên phần cứng thật**.
 
+**Tiên đề của bài toán** — điều đúng về tiếng Việt và về sản phẩm, độc lập với code —
+nằm ở [PRINCIPLES.md](PRINCIPLES.md).
+
 **Vì sao các quyết định là như vậy thì KHÔNG nằm ở đây** — nó sống ở
 [docs/architecture-decisions.md](docs/architecture-decisions.md), append-only, mỗi entry
 một mỏ neo vĩnh viễn (`AD-7`). File này **trỏ** vào đó và không chép lại. Thấy một lý do

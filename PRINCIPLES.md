@@ -21,10 +21,23 @@ Phân vân một quyết định thiết kế → quay về đây trước. Mộ
 
 ---
 
-## A1 — Người gõ không bao giờ được thấy một chuỗi không tồn tại trong tiếng Việt
+## A1 — Buffer có thể là một KHÔNG-TỪ, nhưng không bao giờ được là một dạng tiếng Việt KHÔNG VIẾT ĐƯỢC
 
 Tiên đề bao trùm. Buffer đang gõ dở là thứ người dùng **nhìn thấy**, nên nó phải luôn là
-một chuỗi tiếng Việt hợp lệ hoặc một tiền tố hợp lệ của một chuỗi như vậy.
+một dạng mà chính tả tiếng Việt **viết được** — dù nó chưa (và có thể không bao giờ) là
+một từ.
+
+**Ranh giới này phải sắc, vì nhầm nó hỏng theo hai chiều ngược nhau:**
+
+| | Ví dụ | Phán quyết |
+|---|---|---|
+| **Không viết được** — chính tả tiếng Việt không cho phép | `mùà` (hai dấu), `ưo` | **cấm**, và phải cấm bằng thiết kế |
+| **Viết được nhưng không phải từ** | `tiêng`, `muan`, `soa`, `ngoai` | **bình thường**, engine hiển thị chúng suốt |
+
+Bản mạnh hơn — *"buffer phải luôn là một từ hoặc tiền tố của một từ"* — vừa **sai** vừa
+**tự mâu thuẫn**. Sai: gõ `tieeng` cho buffer `tiêng`, mà `tiêng` không phải từ và cũng
+không phải tiền tố của `tiếng` (`ê` ≠ `ế` ở ký tự thứ ba). Tự mâu thuẫn: muốn tránh
+không-từ thì phải **đoán người dùng định viết gì**, đúng thứ anti-principles cấm.
 
 Hai hệ quả cụ thể, và cả hai đều đã cắn thật:
 
