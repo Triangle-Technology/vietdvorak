@@ -492,20 +492,35 @@ NormalizeNucleus(buffer) {
     }
     if !changed
         return buffer
-    out := JoinChars(chars)
     ; Vần đổi thì chỗ đặt dấu thanh cũng đổi theo: "ngừo" + i phải ra "người"
     ; chứ không phải "ngừơi". Đặt lại dấu bằng đúng quy tắc chuẩn.
-    cur := GetCurrentTone(out)
-    if IsObject(cur) {
-        retoned := ApplyToneToBuffer(StripTone(out), cur.toneIdx)
-        if retoned !== ""
-            out := retoned
-    }
-    return out
+    return ReseatTone(JoinChars(chars))
 }
 
-; Cụm nguyên âm này có phải chính là DẠNG ĐÍCH của một mục NUCLEUS_NORMALIZE
-; không — tức dấu móc đã nằm đúng chỗ, không còn gì để chuẩn hoá nữa?
+; Đặt lại dấu thanh hiện có vào đúng target của buffer hiện tại. Mọi phép đổi hình
+; âm tiết không đi qua đường nối phím PHẢI gọi hàm này: ApplyToneToBuffer ghi dấu
+; mà không gỡ dấu cũ, nên nó chỉ an toàn khi dấu đang nằm đúng target. "tuyf" + "w"
+; đổi target từ "y" sang "ư"; để dấu lại trên "y" thì phím thanh kế tiếp ghi dấu
+; THỨ HAI.
+ReseatTone(buffer) {
+    cur := GetCurrentTone(buffer)
+    if !IsObject(cur)
+        return buffer
+    stripped := StripTone(buffer)
+    retoned := ApplyToneToBuffer(stripped, cur.toneIdx)
+    return retoned !== "" ? retoned : stripped
+}
+
+; Đưa buffer vừa đổi hình về trạng thái hợp lệ: dấu thanh đúng target, vần đúng
+; chính tả. Mọi đường không đi qua nhánh nối phím cuối Transform() kết thúc ở đây.
+Settle(buffer) {
+    return NormalizeNucleus(ReseatTone(buffer))
+}
+
+; Cụm nguyên âm này có KẾT THÚC bằng DẠNG ĐÍCH của một mục NUCLEUS_NORMALIZE
+; không — tức dấu móc đã nằm đúng chỗ, không còn gì để chuẩn hoá nữa? Hậu tố chứ
+; không phải toàn cụm, cùng lý do với MatchHornNucleus: trong "giươ" cụm cuối là
+; "iươ", vì chữ "i" của "gi" cũng là nguyên âm.
 ;
 ; NGUYÊN TẮC hàm này phục vụ, phát biểu một lần ở đây:
 ;     Escape (gõ lại phím trigger) chỉ được phép HUỶ DẤU MÓC DO CHÍNH NGƯỜI DÙNG
@@ -522,7 +537,7 @@ NormalizeNucleus(buffer) {
 IsNormalizedNucleus(shape) {
     global NUCLEUS_NORMALIZE
     for k, rule in NUCLEUS_NORMALIZE {
-        if (rule.fixed == shape)
+        if (SubStr(shape, -StrLen(rule.fixed)) == rule.fixed)
             return true
     }
     return false
@@ -614,7 +629,7 @@ Transform(buffer, key) {
             offset := nuc.start + StrLen(nuc.shape) - StrLen(hornShape)
             Loop StrLen(horned)
                 SetVowelBaseAt(chars, offset + A_Index - 1, SubStr(horned, A_Index, 1))
-            return NormalizeNucleus(JoinChars(chars))
+            return Settle(JoinChars(chars))
         }
 
         ; Vần đã ở ĐÚNG dạng có móc mà NUCLEUS_NORMALIZE nhắm tới ("đưo" vừa được
@@ -632,7 +647,7 @@ Transform(buffer, key) {
             i := chars.Length
             Loop chars.Length {
                 if ApplyWModifierAt(chars, i)
-                    return NormalizeNucleus(JoinChars(chars))
+                    return Settle(JoinChars(chars))
                 i--
             }
             ; No modifiable vowel. Pair-escape first: "ư" + w -> "uw" (literal escape).
@@ -688,7 +703,7 @@ Transform(buffer, key) {
                 table := info.isUpper ? UPPER_VOWELS : VOWELS
                 baseChar := table[info.baseLetter][1]
                 stripped := SubStr(buffer, 1, targetPos - 1) . baseChar . SubStr(buffer, targetPos + 1)
-                return ApplyDiacriticPair(stripped . key)
+                return Settle(ApplyDiacriticPair(stripped . key))
             }
         }
         toned := ApplyToneToBuffer(buffer, toneIdx)
@@ -706,7 +721,7 @@ Transform(buffer, key) {
             esc := PAIR_ESCAPE[lastChar]
             if StrLower(esc.secondKey) == StrLower(key) {
                 ; Replace last char without re-running pair detection
-                return SubStr(buffer, 1, -1) . esc.firstChar . key
+                return Settle(SubStr(buffer, 1, -1) . esc.firstChar . key)
             }
         }
     }

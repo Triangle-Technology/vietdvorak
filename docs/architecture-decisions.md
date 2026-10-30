@@ -495,3 +495,54 @@ không, script vô dụng với mọi source Rust/JS có dấu `\`.
 **Bài học chung**: hai lần trong một ngày, một công cụ kiểm chứng báo "không sao" cho một
 phép kiểm **chưa bao giờ chạy**. Cả hai lần đều được bắt bởi một bước xác minh *phép kiểm
 đã thực sự xảy ra*, không phải bởi việc đọc lại kết quả.
+
+---
+
+## AD-19 — Ba lỗi `Transform()`: sửa ở Rust + JS trước, rồi backport cả sang oracle
+**Ngày**: 2026-10-30 · **Trạng thái**: locked
+
+**Bối cảnh**: fuzz vi sai 3 triệu chuỗi phím giữa JS và Rust cho **0 khác biệt** — nhưng cả
+hai cùng sai, và AHK cũng sai y hệt trên các chuỗi đã thử. Ba engine đồng thuận chỉ chứng
+minh ba bản giống nhau; bộ vector khi đó không có ca nào chạm tới các lỗi này. Ba lỗi, trên
+đường gõ **xuôi**, không cần Backspace:
+
+| Gõ | Ra | Vi phạm |
+|---|---|---|
+| `giuwowngf` | `giườwng` | A3, A4 — so `w` thừa trên **cả** cụm nguyên âm (`iươ`) thay vì hậu tố |
+| `tuyfwf` | `từỳ` | A1.1 — `w` đổi target nhưng không dời dấu; phím thanh sau ghi dấu thứ hai |
+| `thuowss` | `thuơs` | A1.2 — đường escape nối ký tự mà không chuẩn hoá vần |
+
+Lỗi thứ hai bác bỏ tuyên bố trước đó rằng hai dấu là "không thể đạt tới": [AD-9](#ad-9)
+đúng về Backspace, nhưng replay không giúp được khi trạng thái sai sinh ra từ chính
+`transform`.
+
+**Quyết định**: sửa theo đúng thứ tự [AD-9](#ad-9) đặt ra — validate ở Rust, rồi mới
+backport. Thiết kế được dựng và chứng minh trên `crates/vietdvorak-core` + `practice.html`
+trước (vector khi đó nằm ở một section tạm, chỉ áp cho hai bản này), sau đó chủ dự án quyết
+định backport sang `VietDvorak.ahk`, và vector được dời vào `@section transform`. Đây là
+lần **dịch baseline có chủ ý**, không phải ngoại lệ của chỉ dẫn "đừng sửa ngữ nghĩa oracle":
+chỉ dẫn đó cấm phát minh ngữ nghĩa ở AHK, không cấm nhận một thiết kế đã kiểm chứng.
+
+**Thiết kế sửa**: mọi đường đổi hình buffer ngoài đường nối phím đi qua `settle` =
+`reseat_tone` + `normalize_nucleus`, nên bất biến "tối đa một dấu, đúng tại target" được giữ
+ở đường ghi, không canh ở đường đọc. `is_normalized_nucleus` so hậu tố, cùng cách
+`match_horn_nucleus` đã làm.
+
+**Vì sao backport thay vì để AHK lệch**: `giuwowngf` là chuỗi trainer gợi ý cho từ thật
+"giường", nên lỗi này cắn ở việc gõ hằng ngày — đúng điều kiện [AD-9](#ad-9) nêu cho
+backport. Hai lỗi còn lại đòi chuỗi phím không phải cách gõ một từ bình thường (`w` sau dấu
+thanh trên vần không nhận `w`, hoặc huỷ dấu trên vần `uơ`), nhưng chúng cùng nằm trong một
+phép sửa nên tách ra chỉ để lại drift giữa trainer và bộ gõ.
+
+**Đã bác**: chỉ sửa Rust (trainer tiếp tục gợi ý một chuỗi không gõ ra được từ, và JS mất vai
+trò so chéo với Rust trên các ca này).
+
+**Kiểm chứng**: 17 vector đỏ trước khi sửa. Sau khi sửa, cùng fuzz 3 triệu chuỗi cho 0 ca hai
+dấu, 0 ca dấu lệch target, 0 ca `ưo`, 0 ca `uơ` có đuôi, và JS trùng Rust; 60.000 chuỗi qua
+`Transform()` của AHK không lệch Rust chuỗi nào. Test
+`one_tone_on_target_and_no_unwritable_rime_on_every_short_key_sequence` pin bất biến đó. Đột
+biến từng nhánh sửa, ở cả Rust lẫn AHK, đều bị `check-parity.mjs` bắt. Một đột biến sống sót
+— `settle` ở nhánh escape `w` — lộ ra là code chết và đã bị bỏ.
+
+**Chưa kiểm**: đường hook thật của AHK; chỉ `Transform()` được chạy, `HandleLetter` và
+`SyncToScreen` không đổi và không được gõ thử.

@@ -25,11 +25,11 @@ node check-parity.mjs
 ```
 
 ```
-PASS  281 vectors — all three engines: JS 266/266, AHK 266/266, RUST 281/281
+PASS  298 vectors — all three engines: JS 283/283, AHK 283/283, RUST 298/298
 ```
 
 Nó chạy mọi vector trong `telex-conformance.txt` qua **mọi engine mà section đó
-là spec cho**, trong một lần chạy, rồi exit khác 0 nếu bất kỳ bên nào lệch: 266
+là spec cho**, trong một lần chạy, rồi exit khác 0 nếu bất kỳ bên nào lệch: 283
 vector đi qua cả **ba** bản implement của cùng một engine — `Transform()` của
 AutoHotkey, bản mirror JS trong `practice.html`, và crate Rust — còn 15 vector
 `@section backspace` chỉ đi qua bản Rust, vì AHK truncate còn Rust replay, và đó

@@ -443,6 +443,34 @@ thuwr	thử
 myx	mỹ
 quyj	quỵ
 
+# --- A redundant "w" is judged on the END of the vowel run, not on the whole run.
+# --- The "i" of "gi" sits in the run too, so "iươ" used to read as "not the
+# --- finished rime" and the "w" escaped a horn the ENGINE had put there (A4).
+giuwowngf	giường
+giuwowng	giương
+giuwow	giươ
+giuwowww	giươ
+Giuwowngf	Giường
+
+# --- A late "w" can move the vowel the tone belongs to, and the tone has to move
+# --- with it. It used to stay behind, off target, so the NEXT tone key wrote a
+# --- second tone beside it (A1.1) — on the forward path, with no Backspace.
+tuyfw	từy
+tuyfwf	tưyf
+huyrws	hứy
+hoefw	hờe
+hoefws	hớe
+huynhfw	hừynh
+huynhfws	hứynh
+oeifws	ớei
+thuyrwr	thưyr
+
+# --- An escape appends a character too, so the rime gets normalised like any
+# --- other append: "uơ" with something after it is not a form that can stand.
+thuowss	thươs
+uowss	ươs
+uoowo	ươo
+
 @section integration
 
 # --- Syllable break: only A-Za-z continues a syllable, everything else ends it

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # dot-bien.sh — áp một đột biến vào source, chạy một lệnh kiểm, rồi hoàn nguyên.
 #
-# 281 vector conformance chỉ có giá trị nếu chúng ĐỎ khi engine sai. Chạy xanh
+# Bộ vector conformance chỉ có giá trị nếu chúng ĐỎ khi engine sai. Chạy xanh
 # không chứng minh điều đó — nó chỉ chứng minh engine khớp spec ở những chỗ spec
 # nói tới. Script này trả lời câu còn lại: bộ vector có RĂNG không.
 #

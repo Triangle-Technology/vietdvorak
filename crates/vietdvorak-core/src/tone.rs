@@ -101,9 +101,10 @@ fn collect_vowels(chars: &[char], start: usize) -> Vec<(usize, char)> {
 /// GHI CHÚ về bất biến: hàm này ghi dấu tại target mà KHÔNG gỡ dấu cũ ở nơi
 /// khác, y như bản AHK (`ApplyToneToBuffer`, chú thích "Always apply"). Nó an
 /// toàn CHỈ KHI buffer giữ được bất biến "tối đa một dấu, và dấu đó nằm đúng
-/// tại `find_tone_target`". Đường gõ xuôi giữ được bất biến ấy vì nó
-/// [`strip_tone`] trước rồi mới gắn lại. Bản AHK phá bất biến này ở đường
-/// backspace — xem chú thích của [`crate::Session`].
+/// tại `find_tone_target`". Đường nối phím giữ được bất biến ấy vì nó
+/// [`strip_tone`] trước rồi mới gắn lại; các đường khác giữ nó bằng
+/// [`reseat_tone`]. Bản AHK phá bất biến này ở đường backspace — xem chú thích của
+/// [`crate::Session`].
 #[must_use]
 pub(crate) fn apply_tone(chars: &[char], tone: usize) -> Option<Vec<char>> {
     let pos = find_tone_target(chars)?;
@@ -112,6 +113,20 @@ pub(crate) fn apply_tone(chars: &[char], tone: usize) -> Option<Vec<char>> {
     let mut out = chars.to_vec();
     *out.get_mut(pos)? = new;
     Some(out)
+}
+
+/// Đặt lại dấu thanh hiện có vào đúng target của buffer hiện tại.
+///
+/// Mọi phép đổi hình âm tiết mà không đi qua đường nối phím PHẢI gọi hàm này:
+/// nó là thứ giữ bất biến mà [`apply_tone`] dựa vào. `tuyf` + `w` đổi target từ
+/// `y` sang `ư`; để dấu lại trên `y` thì phím thanh kế tiếp ghi dấu THỨ HAI.
+#[must_use]
+pub(crate) fn reseat_tone(chars: &[char]) -> Vec<char> {
+    let Some((_, tone)) = current_tone(chars) else {
+        return chars.to_vec();
+    };
+    let stripped = strip_tone(chars);
+    apply_tone(&stripped, tone).unwrap_or(stripped)
 }
 
 /// Dấu thanh hiện có trong buffer: `(chỉ số, chỉ số thanh)`.

@@ -12,7 +12,7 @@ use crate::nucleus::{
     trailing_nucleus,
 };
 use crate::tables::{diacritic_pair, pair_escape, tone_index};
-use crate::tone::{apply_tone, current_tone, find_tone_target, strip_tone};
+use crate::tone::{apply_tone, current_tone, find_tone_target, reseat_tone, strip_tone};
 use crate::vowel::{compose, find_vowel_info, is_vowel_char, lower1, upper1};
 
 /// Máy trạng thái Telex.
@@ -91,7 +91,7 @@ impl Telex {
             for (i, c) in horned.chars().enumerate() {
                 crate::vowel::set_vowel_base_at(&mut chars, offset.checked_add(i)?, c);
             }
-            return Some(normalize_nucleus(&chars));
+            return Some(settle(&chars));
         }
 
         // Vần đã ở ĐÚNG dạng có móc mà chuẩn hoá nhắm tới ("đưo" vừa thành
@@ -108,7 +108,7 @@ impl Telex {
         }
         for i in (0..chars.len()).rev() {
             if apply_w_modifier_at(&mut chars, i) {
-                return Some(normalize_nucleus(&chars));
+                return Some(settle(&chars));
             }
         }
 
@@ -151,6 +151,12 @@ impl Telex {
     }
 }
 
+/// Đưa buffer vừa đổi hình về trạng thái hợp lệ: dấu thanh đúng target, vần đúng
+/// chính tả. Mọi đường không đi qua [`append_with_tone_migration`] kết thúc ở đây.
+fn settle(chars: &[char]) -> Vec<char> {
+    normalize_nucleus(&reseat_tone(chars))
+}
+
 /// `ư` hay `Ư`, theo kiểu chữ của phím vừa gõ.
 fn horn_u(key: char) -> char {
     if lower1(key) == Some(key) { 'ư' } else { 'Ư' }
@@ -170,7 +176,7 @@ fn tone_key_path(buffer: &[char], key: char) -> Option<Vec<char>> {
         let mut stripped = buffer.to_vec();
         *stripped.get_mut(pos)? = bare;
         stripped.push(key);
-        return Some(apply_diacritic_pair(&stripped));
+        return Some(settle(&apply_diacritic_pair(&stripped)));
     }
 
     apply_tone(buffer, tone)
@@ -189,7 +195,7 @@ fn pair_escape_path(buffer: &[char], key: char) -> Option<Vec<char>> {
     let mut out = buffer.get(..buffer.len().checked_sub(1)?)?.to_vec();
     out.push(first);
     out.push(key);
-    Some(out)
+    Some(settle(&out))
 }
 
 /// Nối phím vào buffer, có DI TRÚ dấu thanh.
@@ -249,6 +255,7 @@ fn apply_diacritic_pair(chars: &[char]) -> Vec<char> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vowel::vowel_base;
     use alloc::string::String;
 
     /// Gõ cả chuỗi vào một buffer rỗng, như `@section transform` của spec.
@@ -309,6 +316,46 @@ mod tests {
         assert_eq!(typed("Aa"), "Â");
         assert_eq!(typed("aA"), "â");
         assert_eq!(typed("Dd"), "Đ");
+    }
+
+    /// Đi hết mọi chuỗi phím dài tới `depth` trên `KEYS`, gọi `check` ở mỗi bước.
+    /// Chia sẻ tiền tố, nên mỗi nút chỉ tốn đúng một lần `transform`.
+    fn walk(telex: &Telex, buf: &[char], depth: usize, check: &mut dyn FnMut(&[char])) {
+        const KEYS: &str = "aeouydwsfnA";
+        if depth == 0 {
+            return;
+        }
+        for k in KEYS.chars() {
+            let mut t = telex.clone();
+            let next = t.transform(buf, k);
+            check(&next);
+            walk(&t, &next, depth.saturating_sub(1), check);
+        }
+    }
+
+    #[test]
+    fn one_tone_on_target_and_no_unwritable_rime_on_every_short_key_sequence() {
+        // Đây là bất biến trên MỌI trạng thái, thứ một vector đơn lẻ không phát
+        // biểu được. Nó tồn tại vì lỗi hai dấu từng tới được ngay trên đường gõ
+        // xuôi trong khi crate này tuyên bố "không thể đạt tới".
+        let mut bad: Vec<String> = Vec::new();
+        walk(&Telex::new(), &[], 5, &mut |buf| {
+            let toned: Vec<usize> = (0..buf.len())
+                .filter(|&i| find_vowel_info(buf[i]).is_some_and(|v| v.tone > 0))
+                .collect();
+            let off_target = toned.len() == 1 && find_tone_target(buf) != Some(toned[0]);
+            let bases: Vec<Option<char>> = buf.iter().map(|c| vowel_base(*c)).collect();
+            let unwritable = bases.windows(2).any(|p| p == [Some('ư'), Some('o')]);
+            if toned.len() > 1 || off_target || unwritable {
+                bad.push(buf.iter().collect());
+            }
+        });
+        assert!(
+            bad.is_empty(),
+            "{} trạng thái sai, ví dụ {:?}",
+            bad.len(),
+            bad.first()
+        );
     }
 
     #[test]

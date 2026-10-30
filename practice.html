@@ -859,6 +859,25 @@ function stripTone(buffer) {
   return chars.join('');
 }
 
+// Put the buffer's tone back on the buffer's CURRENT target. Every reshape that
+// does not go through the normal append path has to call this: applyToneToBuffer()
+// writes without stripping, so it is only safe while the one tone sits on target.
+// "tuyf" + "w" moves the target from "y" to "ư"; leaving the tone on the "y" lets
+// the next tone key write a SECOND one.
+function reseatTone(buffer) {
+  const cur = getCurrentTone(buffer);
+  if (!cur) return buffer;
+  const stripped = stripTone(buffer);
+  const retoned = applyToneToBuffer(stripped, cur.toneIdx);
+  return retoned !== null ? retoned : stripped;
+}
+
+// Bring a reshaped buffer back to a legal state: tone on target, rime spelled
+// correctly. Every path that skips the normal append ends here.
+function settle(buffer) {
+  return normalizeNucleus(reseatTone(buffer));
+}
+
 // Vietnamese phonotactic fix, table-driven from NUCLEUS_NORMALIZE: the horn has
 // to sit where the spelling puts it, so "đưoc"/"đuợc" both become "được".
 // WHETHER a rime has to wait for the next character is read off that entry's
@@ -882,24 +901,20 @@ function normalizeNucleus(buffer) {
     changed = true;
   }
   if (!changed) return buffer;
-  let out = chars.join('');
   // A changed rime moves the tone with it: "ngừo" + i must give "người", not
   // "ngừơi". Re-place the tone with the standard rule.
-  const cur = getCurrentTone(out);
-  if (cur) {
-    const retoned = applyToneToBuffer(stripTone(out), cur.toneIdx);
-    if (retoned !== null) out = retoned;
-  }
-  return out;
+  return reseatTone(chars.join(''));
 }
 
-// Is this vowel cluster already the TARGET form of a NUCLEUS_NORMALIZE entry —
+// Does this vowel cluster END in the TARGET form of a NUCLEUS_NORMALIZE entry —
 // i.e. the horn is where the spelling wants it and there is nothing left to fix?
+// The END and not the whole cluster, for the reason matchHornNucleus() matches a
+// suffix: in "giươ" the cluster is "iươ", because the "i" of "gi" is a vowel too.
 // Read straight off the table instead of re-typing "ươ" here, so a new rime in
 // the table makes this correct for free.
 function isNormalizedNucleus(shape) {
   for (const rule of Object.values(NUCLEUS_NORMALIZE)) {
-    if (rule.fixed === shape) return true;
+    if (shape.endsWith(rule.fixed)) return true;
   }
   return false;
 }
@@ -994,7 +1009,7 @@ function transform(buffer, key) {
       for (let k = 0; k < horned.length; k++) {
         setVowelBaseAt(chars, offset + k, horned[k]);
       }
-      return normalizeNucleus(chars.join(''));  // 'w' consumed
+      return settle(chars.join(''));  // 'w' consumed
     }
 
     // The rime is ALREADY in the horned form a NUCLEUS_NORMALIZE entry targets
@@ -1013,7 +1028,7 @@ function transform(buffer, key) {
     if (!(immediatePair in DIACRITIC_PAIRS)) {
       for (let i = chars.length - 1; i >= 0; i--) {
         if (applyWModifierAt(chars, i)) {
-          return normalizeNucleus(chars.join(''));  // 'w' consumed
+          return settle(chars.join(''));  // 'w' consumed
         }
       }
       // No modifiable vowel. Pair-escape first: "ư" + w -> "uw" (literal escape).
@@ -1062,7 +1077,7 @@ function transform(buffer, key) {
         // ("ass" -> "as", "aff" -> "af", etc.)
         const table = info.isUpper ? UPPER_VOWELS : VOWELS;
         chars[targetIdx] = table[info.base][0];
-        return applyDiacriticPair(chars.join('') + key);
+        return settle(applyDiacriticPair(chars.join('') + key));
       }
     }
     const toned = applyToneToBuffer(buffer, toneIdx);
@@ -1079,8 +1094,8 @@ function transform(buffer, key) {
     const escapeInfo = PAIR_ESCAPE[lastChar];
     if (escapeInfo && escapeInfo.secondKey === lower) {
       chars[chars.length - 1] = escapeInfo.firstChar;
-      // Return without re-running pair detection (it would just re-form the pair)
-      return chars.join('') + key;
+      // No pair detection here (it would just re-form the pair)
+      return settle(chars.join('') + key);
     }
   }
 
@@ -3313,6 +3328,34 @@ const TELEX_VECTORS = [
   ['thuwr',     'thử'],
   ['myx',       'mỹ'],
   ['quyj',      'quỵ'],
+
+  // A redundant "w" is judged on the END of the vowel run, not on the whole run.
+  // The "i" of "gi" sits in the run too, so "iươ" used to read as "not the
+  // finished rime" and the "w" escaped a horn the ENGINE had put there (A4).
+  ['giuwowngf', 'giường'],
+  ['giuwowng',  'giương'],
+  ['giuwow',    'giươ'],
+  ['giuwowww',  'giươ'],
+  ['Giuwowngf', 'Giường'],
+
+  // A late "w" can move the vowel the tone belongs to, and the tone has to move
+  // with it. It used to stay behind, off target, so the NEXT tone key wrote a
+  // second tone beside it (A1.1) — on the forward path, with no Backspace.
+  ['tuyfw',     'từy'],
+  ['tuyfwf',    'tưyf'],
+  ['huyrws',    'hứy'],
+  ['hoefw',     'hờe'],
+  ['hoefws',    'hớe'],
+  ['huynhfw',   'hừynh'],
+  ['huynhfws',  'hứynh'],
+  ['oeifws',    'ớei'],
+  ['thuyrwr',   'thưyr'],
+
+  // An escape appends a character too, so the rime gets normalised like any
+  // other append: "uơ" with something after it is not a form that can stand.
+  ['thuowss',   'thươs'],
+  ['uowss',     'ươs'],
+  ['uoowo',     'ươo'],
 ];
 // END GENERATED FROM telex-conformance.txt
 

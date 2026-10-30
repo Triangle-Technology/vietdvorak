@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 
 use crate::tables::{HORN_NUCLEUS, NUCLEUS_NORMALIZE, w_modifier};
-use crate::tone::{apply_tone, current_tone, strip_tone};
+use crate::tone::reseat_tone;
 use crate::vowel::{find_vowel_info, set_vowel_base_at, vowel_base};
 
 /// Cụm nguyên âm ở CUỐI buffer: `(chỉ số bắt đầu, chuỗi chữ cái gốc)`.
@@ -46,8 +46,11 @@ pub(crate) fn match_horn_nucleus(shape: &[char]) -> Option<(&'static str, &'stat
     None
 }
 
-/// Cụm nguyên âm này có phải chính là DẠNG ĐÍCH của một luật chuẩn hoá không —
+/// Cụm nguyên âm này có KẾT THÚC bằng DẠNG ĐÍCH của một luật chuẩn hoá không —
 /// tức dấu móc đã nằm đúng chỗ, không còn gì để sửa?
+///
+/// Hậu tố chứ không phải toàn cụm, cùng lý do với [`match_horn_nucleus`]: trong
+/// `giươ` cụm cuối là `iươ`, vì chữ `i` của `gi` cũng là nguyên âm.
 ///
 /// Hàm này phục vụ tiên đề **A4** (`PRINCIPLES.md`) — escape huỷ thứ NGƯỜI DÙNG
 /// gõ ra, không bao giờ huỷ thứ ENGINE tự chèn. Phát biểu chung sống ở đó; dưới
@@ -63,9 +66,12 @@ pub(crate) fn match_horn_nucleus(shape: &[char]) -> Option<(&'static str, &'stat
 /// [`NUCLEUS_NORMALIZE`] là chỗ này tự đúng theo.
 #[must_use]
 pub(crate) fn is_normalized_nucleus(shape: &[char]) -> bool {
-    NUCLEUS_NORMALIZE
-        .iter()
-        .any(|r| r.fixed.chars().eq(shape.iter().copied()))
+    NUCLEUS_NORMALIZE.iter().any(|r| {
+        r.fixed
+            .chars()
+            .rev()
+            .eq(shape.iter().rev().take(r.fixed.chars().count()).copied())
+    })
 }
 
 /// Áp dấu móc/trăng của phím `w` lên nguyên âm tại `pos`, giữ nguyên dấu thanh.
@@ -130,12 +136,7 @@ pub(crate) fn normalize_nucleus(chars: &[char]) -> Vec<char> {
     }
     // Vần đổi thì chỗ đặt dấu thanh cũng đổi theo: "ngừo" + i phải ra "người"
     // chứ không phải "ngừơi". Đặt lại dấu bằng đúng quy tắc chuẩn.
-    if let Some((_, tone)) = current_tone(&out)
-        && let Some(retoned) = apply_tone(&strip_tone(&out), tone)
-    {
-        return retoned;
-    }
-    out
+    reseat_tone(&out)
 }
 
 #[cfg(test)]
@@ -192,7 +193,9 @@ mod tests {
     #[test]
     fn normalized_shape_is_read_from_the_table() {
         assert!(is_normalized_nucleus(&v("ươ")));
+        assert!(is_normalized_nucleus(&v("iươ")));
         assert!(!is_normalized_nucleus(&v("ưo")));
         assert!(!is_normalized_nucleus(&v("ơ")));
+        assert!(!is_normalized_nucleus(&v("")));
     }
 }

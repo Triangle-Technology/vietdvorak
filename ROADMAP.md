@@ -23,7 +23,7 @@ Lý do của mọi lựa chọn kiến trúc nằm ở [ARCHITECTURE.md](ARCHITE
 
 ```
 node check-parity.mjs
-  PASS  281 vectors — all three engines: JS 266/266, AHK 266/266, RUST 281/281
+  PASS  298 vectors — all three engines: JS 283/283, AHK 283/283, RUST 298/298
 ```
 
 **v0 = tới hết M7** — chạy được trên máy mình, `<layout>default</layout>`, zero
